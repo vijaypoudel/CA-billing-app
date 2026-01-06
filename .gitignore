@@ -17,9 +17,10 @@ coverage.xml
 .hypothesis/
 
 # Data & Local Files (Database moved to Documents)
-data/
-Invoices/
-exports/
+# Only ignore generated files, not the code folders
+data/*.db
+Invoices/*.pdf
+exports/*.xlsx
 *.db
 *.xlsx
 *.pdf

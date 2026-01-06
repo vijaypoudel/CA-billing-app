@@ -4,8 +4,8 @@ import sys
 import shutil
 import argparse
 
-def build_app(onefile=False):
-    print(f"Building CA Billing App ({'Single File' if onefile else 'Folder'} mode)...")
+def build_app(onefile=False, debug=False):
+    print(f"Building CA Billing App ({'Single File' if onefile else 'Folder'} mode, {'DEBUG' if debug else 'Standard'})...")
     
     # 1. Install PyInstaller if missing
     try:
@@ -15,10 +15,6 @@ def build_app(onefile=False):
         subprocess.check_call([sys.executable, "-m", "pip", "install", "pyinstaller"])
 
     # 2. Define Command
-    # --noconfirm: overwrite existing
-    # --windowed: no console window
-    # --name: output name
-    
     mode_flag = "--onefile" if onefile else "--onedir"
     
     cmd = [
@@ -27,11 +23,20 @@ def build_app(onefile=False):
         "PyInstaller",
         "--noconfirm",
         mode_flag,
-        "--windowed",
         "--name=CABillingApp",
         "--clean",
+        "--paths=ca_billing_app",
+        "--collect-all=PySide6",
+        "--hidden-import=services",
+        "--hidden-import=services.reporting_service",
+        "--hidden-import=exports",
+        "--hidden-import=exports.excel_exporter",
         "ca_billing_app/main.py"
     ]
+    
+    # Add windowed flag ONLY if not in debug mode
+    if not debug:
+        cmd.append("--windowed")
     
     print(f"Running: {' '.join(cmd)}")
     try:
@@ -42,10 +47,13 @@ def build_app(onefile=False):
         if onefile:
             ext = ".exe" if os.name == 'nt' else ".app" if sys.platform == 'darwin' else ""
             print(f"Executable is located in: {os.path.join(output_base, 'CABillingApp' + ext)}")
-            print("You can share this single file directly with anyone on the SAME operating system.")
         else:
             print(f"Folder is located in: {os.path.join(output_base, 'CABillingApp')}")
-            print("You MUST zip this entire folder before sharing.")
+            
+        if debug:
+            print("\nDEBUG NOTE: Running the created file from a terminal (cmd/powershell) will now show any errors.")
+        else:
+            print("You can share this file with anyone on the SAME operating system.")
             
     except subprocess.CalledProcessError as e:
         print(f"\nBuild failed with error: {e}")
@@ -54,6 +62,7 @@ def build_app(onefile=False):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Build CA Billing App")
     parser.add_argument("--onefile", action="store_true", help="Build as a single executable file")
+    parser.add_argument("--debug", action="store_true", help="Build with console visible for debugging")
     args = parser.parse_args()
     
-    build_app(onefile=args.onefile)
+    build_app(onefile=args.onefile, debug=args.debug)

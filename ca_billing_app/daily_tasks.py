@@ -8,11 +8,17 @@ from email.mime.base import MIMEBase
 from email import encoders
 import sys
 
-# Add project root to path to import services
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+import sys
 
-from services.reporting_service import ReportingService
-from exports.excel_exporter import ExcelExporter
+try:
+    from services.reporting_service import ReportingService
+    from exports.excel_exporter import ExcelExporter
+except ImportError:
+    # Fallback for if we are running the script directly from inside its folder
+    import os
+    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+    from services.reporting_service import ReportingService
+    from exports.excel_exporter import ExcelExporter
 
 from config_manager import config_manager
 
