@@ -28,7 +28,7 @@ class PaymentDialog(QDialog):
         
         # Mode
         self.mode_combo = QComboBox()
-        self.mode_combo.addItems(["NEFT", "UPI", "CHEQUE", "CASH", "IMPS"])
+        self.mode_combo.addItems(["NEFT", "UPI", "CHEQUE", "CASH", "IMPS", "TDS", "OTHERS"])
         form_layout.addRow("Mode:", self.mode_combo)
         
         # Reference
