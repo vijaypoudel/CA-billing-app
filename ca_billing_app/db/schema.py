@@ -32,8 +32,7 @@ def create_schema(connection):
         client_name TEXT NOT NULL,
         address TEXT,
         email TEXT,
-        phone TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        phone TEXT
     );
     """)
 
