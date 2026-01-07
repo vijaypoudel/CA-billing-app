@@ -46,7 +46,6 @@ def create_schema(connection):
         branch_name TEXT NOT NULL,
         city TEXT NOT NULL,
         bank_name TEXT NOT NULL,
-        bank_branch TEXT NOT NULL,
         ifsc_code TEXT NOT NULL,
         account_number TEXT NOT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
