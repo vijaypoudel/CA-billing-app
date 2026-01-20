@@ -142,17 +142,6 @@ class OfficeMaster(QWidget):
         
         path_layout.addWidget(self.db_path_lbl, 3)
         path_layout.addWidget(self.change_path_btn, 1)
-
-        self.reset_db_btn = QPushButton("Reset Database")
-        self.reset_db_btn.setFixedHeight(30)
-        self.reset_db_btn.clicked.connect(self.reset_database)
-        self.reset_db_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #c0392b; color: white; border-radius: 4px; padding: 0 15px; font-size: 11px;
-            }
-            QPushButton:hover { background-color: #a93226; }
-        """)
-        path_layout.addWidget(self.reset_db_btn, 1)
         
         storage_layout.addLayout(path_layout)
         
@@ -226,54 +215,6 @@ class OfficeMaster(QWidget):
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Failed to relocate database: {e}")
 
-    def reset_database(self):
-        # 1. First Warning
-        confirm1 = QMessageBox.warning(self, "Factory Reset", 
-                                       "This will delete ALL invoices, clients, and bank records.\n\n"
-                                       "Do you want to proceed?",
-                                       QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-        
-        if confirm1 != QMessageBox.Yes:
-            return
-
-        # 2. Final Critical Warning
-        confirm2 = QMessageBox.critical(self, "FINAL CONFIRMATION", 
-                                        "Are you ABSOLUTELY sure?\n\n"
-                                        "Current records will be wiped and a safety archive will be created.",
-                                        QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-        
-        if confirm2 == QMessageBox.Yes:
-            old_path = config_manager.get_db_path()
-            try:
-                # 3. Create Safety Archive (Backup)
-                import datetime
-                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                archive_dir = os.path.join(os.path.dirname(old_path), "archives")
-                if not os.path.exists(archive_dir):
-                    os.makedirs(archive_dir)
-                
-                archive_path = os.path.join(archive_dir, f"reset_archive_{timestamp}.db")
-                shutil.copy2(old_path, archive_path)
-                
-                # 4. Perform Reset
-                conn = self.db.get_connection()
-                try:
-                    conn.execute("PRAGMA foreign_keys = OFF")
-                    tables = ['payments', 'invoice_items', 'invoices', 'branches', 'clients', 'offices']
-                    for table in tables:
-                        conn.execute(f"DELETE FROM {table}")
-                    conn.execute("DELETE FROM sqlite_sequence")
-                    conn.commit()
-                    
-                    QMessageBox.information(self, "Success", 
-                                            f"Database Reset Complete!\n\n"
-                                            f"A safety archive was saved to:\n{archive_path}")
-                    self.load_data()
-                    self.clear_form()
-                finally:
-                    conn.close()
-            except Exception as e:
-                QMessageBox.critical(self, "Error", f"Failed to reset database: {e}")
 
     def create_input_group(self, parent_layout, label_text, placeholder, is_row=False):
         group = QVBoxLayout() if not is_row else QVBoxLayout()
