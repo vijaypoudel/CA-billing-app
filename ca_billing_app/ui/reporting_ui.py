@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QPushButton, QMessageBox, 
                                QFileDialog, QCheckBox, QDialog, QDialogButtonBox, QLabel,
                                QScrollArea, QHBoxLayout, QComboBox, QLineEdit, QTabWidget,
-                               QTableWidget, QTableWidgetItem, QGroupBox, QFrame)
+                               QTableWidget, QTableWidgetItem, QGroupBox, QFrame, QGridLayout)
 from PySide6.QtGui import QFont, QIcon
 from PySide6.QtCore import Qt
 from services.reporting_service import ReportingService
@@ -12,19 +12,52 @@ class FieldSelectionDialog(QDialog):
     def __init__(self, available_fields, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Select Fields to Export")
+        self.setMinimumSize(500, 400)
         self.layout = QVBoxLayout(self)
         
+        # Instructions
+        self.layout.addWidget(QLabel("Select the fields you want to include in the export:"))
+        
+        # Scroll area with grid layout for checkboxes
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll_widget = QWidget()
+        grid = QGridLayout(scroll_widget)
+        grid.setSpacing(10)
+        
         self.checkboxes = []
-        for field in available_fields:
+        num_columns = 3  # Number of columns for checkboxes
+        
+        for i, field in enumerate(available_fields):
             cb = QCheckBox(field)
             cb.setChecked(True)
-            self.layout.addWidget(cb)
+            row = i // num_columns
+            col = i % num_columns
+            grid.addWidget(cb, row, col)
             self.checkboxes.append(cb)
+        
+        scroll.setWidget(scroll_widget)
+        self.layout.addWidget(scroll)
+        
+        # Select All / Deselect All buttons
+        btn_row = QHBoxLayout()
+        select_all_btn = QPushButton("Select All")
+        select_all_btn.clicked.connect(lambda: self._set_all_checked(True))
+        deselect_all_btn = QPushButton("Deselect All")
+        deselect_all_btn.clicked.connect(lambda: self._set_all_checked(False))
+        btn_row.addWidget(select_all_btn)
+        btn_row.addWidget(deselect_all_btn)
+        btn_row.addStretch()
+        self.layout.addLayout(btn_row)
             
         self.buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         self.buttons.accepted.connect(self.accept)
         self.buttons.rejected.connect(self.reject)
         self.layout.addWidget(self.buttons)
+    
+    def _set_all_checked(self, checked):
+        for cb in self.checkboxes:
+            cb.setChecked(checked)
         
     def get_selected_fields(self):
         return [cb.text() for cb in self.checkboxes if cb.isChecked()]
