@@ -282,7 +282,8 @@ class OfficeMaster(QWidget):
         
         line_edit = QLineEdit()
         line_edit.setPlaceholderText(placeholder)
-        line_edit.setFixedHeight(35)
+        line_edit.setMinimumHeight(35)
+        line_edit.setMaximumHeight(35)
         line_edit.setStyleSheet("""
             QLineEdit {
                 border: 1px solid #dcdde1;

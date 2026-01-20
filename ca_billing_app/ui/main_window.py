@@ -17,6 +17,15 @@ class MainWindow(QMainWindow):
         self.init_ui()
 
     def init_ui(self):
+        # Global stylesheet for dropdown opaque backgrounds (Windows fix)
+        self.setStyleSheet("""
+            QComboBox QAbstractItemView {
+                background-color: white;
+                selection-background-color: #AED6F1;
+                border: 1px solid #D5DBDB;
+            }
+        """)
+        
         self.tabs = QTabWidget()
         self.setCentralWidget(self.tabs)
         

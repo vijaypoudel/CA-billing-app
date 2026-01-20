@@ -9,6 +9,18 @@ class PaymentService:
     def add_payment(self, invoice_id, amount, payment_date, mode, reference, notes=""):
         conn = self.db.get_connection()
         try:
+            # Get invoice total and current paid amount for validation
+            inv_row = conn.execute("SELECT grand_total FROM invoices WHERE id = ?", (invoice_id,)).fetchone()
+            paid_row = conn.execute("SELECT COALESCE(SUM(amount_received), 0) as total_paid FROM payments WHERE invoice_id = ?", (invoice_id,)).fetchone()
+            
+            grand_total = inv_row['grand_total']
+            already_paid = paid_row['total_paid']
+            remaining = grand_total - already_paid
+            
+            # Validate: payment should not exceed remaining balance
+            if amount > remaining + 0.01:  # Small tolerance for floating point
+                raise ValueError(f"Payment amount (₹{amount:.2f}) exceeds remaining balance (₹{remaining:.2f})")
+            
             conn.execute("BEGIN")
             
             # Insert payment

@@ -168,14 +168,18 @@ class InvoiceList(QWidget):
             
             menu = QMenu(self)
             inv_id = row['id']
+            is_paid = row['status'].lower() == 'paid'
             
             edit_act = menu.addAction("Edit Invoice")
+            edit_act.setEnabled(not is_paid)  # Freeze if paid
             edit_act.triggered.connect(lambda _, rid=inv_id: self.edit_invoice(rid))
             
             status_act = menu.addAction("Change Status")
+            status_act.setEnabled(not is_paid)  # Freeze if paid
             status_act.triggered.connect(lambda _, rid=inv_id: self.change_status(rid))
             
             pay_act = menu.addAction("Add Payment")
+            pay_act.setEnabled(not is_paid)  # Freeze if paid - already fully paid
             pay_act.triggered.connect(lambda _, rid=inv_id: self.open_payment_dialog(rid))
             
             hist_act = menu.addAction("View History")

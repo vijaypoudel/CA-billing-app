@@ -76,8 +76,14 @@ class ReportingUI(QWidget):
                 background: white;
                 min-width: 120px;
                 min-height: 25px;
+                max-height: 35px;
             }
             QComboBox::drop-down { border: none; }
+            QComboBox QAbstractItemView {
+                background-color: white;
+                selection-background-color: #AED6F1;
+                border: 1px solid #D5DBDB;
+            }
             QGroupBox {
                 font-weight: bold; 
                 color: #2C3E50; 

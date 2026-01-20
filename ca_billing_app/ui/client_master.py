@@ -122,7 +122,8 @@ class ClientMaster(QWidget):
         
         line_edit = QLineEdit()
         line_edit.setPlaceholderText(placeholder)
-        line_edit.setFixedHeight(30)
+        line_edit.setMinimumHeight(30)
+        line_edit.setMaximumHeight(30)
         line_edit.setStyleSheet("""
             QLineEdit {
                 border: 1px solid #dcdde1;
