@@ -1,7 +1,8 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, 
                                QLineEdit, QPushButton, QTableWidget, QTableWidgetItem, 
                                QHeaderView, QMessageBox, QLabel, QComboBox, QDateEdit, 
-                               QCompleter, QCheckBox, QTextEdit, QGroupBox, QFrame)
+                               QCompleter, QCheckBox, QTextEdit, QGroupBox, QFrame,
+                               QScrollArea)
 from PySide6.QtCore import Qt, QDate, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtCore import QUrl
@@ -24,9 +25,23 @@ class InvoiceForm(QWidget):
         # Runtime Schema Check
         self.check_db_schema()
         
-        self.layout = QVBoxLayout(self)
-        self.layout.setSpacing(15)
-        self.layout.setContentsMargins(20, 20, 20, 20)
+        # Create outer scroll area for entire form
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QFrame.NoFrame)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        
+        # Content widget inside scroll area
+        content_widget = QWidget()
+        self.layout = QVBoxLayout(content_widget)
+        self.layout.setSpacing(12)
+        self.layout.setContentsMargins(15, 15, 15, 15)
+        
+        scroll_area.setWidget(content_widget)
+        main_layout.addWidget(scroll_area)
         
         # Title based on mode
         self.title_label = QLabel("Update Invoice" if is_update_mode else "Create New Invoice")
@@ -55,6 +70,8 @@ class InvoiceForm(QWidget):
         self.office_display = QTextEdit()
         self.office_display.setReadOnly(True)
         self.office_display.setMaximumHeight(80)
+        self.office_display.setMinimumWidth(200)
+        self.office_display.setMaximumWidth(500)
         self.office_display.setStyleSheet("""
             background-color: #F8F9F9; 
             border: 1px solid #D5DBDB; 
@@ -63,6 +80,8 @@ class InvoiceForm(QWidget):
         """)
         
         bus_layout.addWidget(QLabel("Select Office:"))
+        self.office_combo.setMinimumWidth(200)
+        self.office_combo.setMaximumWidth(500)
         bus_layout.addWidget(self.office_combo)
         bus_layout.addWidget(QLabel("Registered Address:"))
         bus_layout.addWidget(self.office_display)
@@ -72,6 +91,7 @@ class InvoiceForm(QWidget):
         invoice_details_group.setStyleSheet("font-weight: bold; color: #34495E;")
         inv_form = QFormLayout(invoice_details_group)
         inv_form.setSpacing(10)
+        inv_form.setFieldGrowthPolicy(QFormLayout.FieldsStayAtSizeHint)
         
         # Client Selection (Searchable)
         self.client_combo = QComboBox()
@@ -81,6 +101,8 @@ class InvoiceForm(QWidget):
         self.client_combo.completer().setFilterMode(Qt.MatchContains)
         self.client_combo.lineEdit().setPlaceholderText("Search Client (GSTIN / Name)...")
         self.client_combo.setStyleSheet("font-weight: normal; padding: 5px;")
+        self.client_combo.setMinimumWidth(250)
+        self.client_combo.setMaximumWidth(500)
         self.client_combo.currentIndexChanged.connect(self.auto_select_tax_type)
         
         # Date
@@ -88,6 +110,8 @@ class InvoiceForm(QWidget):
         self.date_edit.setCalendarPopup(True)
         self.date_edit.setDate(QDate.currentDate())
         self.date_edit.setStyleSheet("font-weight: normal; padding: 5px;")
+        self.date_edit.setMinimumWidth(150)
+        self.date_edit.setMaximumWidth(250)
         
         # POS
         from utils.gst_states import get_state_list
@@ -96,11 +120,15 @@ class InvoiceForm(QWidget):
         self.pos_combo.addItems(get_state_list())
         self.pos_combo.setCurrentIndex(-1)
         self.pos_combo.setStyleSheet("font-weight: normal; padding: 5px;")
+        self.pos_combo.setMinimumWidth(200)
+        self.pos_combo.setMaximumWidth(400)
         
         # Tax Type
         self.tax_combo = QComboBox()
         self.tax_combo.addItems(["IGST", "CGST_SGST", "NONE"])
         self.tax_combo.setStyleSheet("font-weight: normal; padding: 5px;")
+        self.tax_combo.setMinimumWidth(150)
+        self.tax_combo.setMaximumWidth(250)
         
         inv_form.addRow("Client (GSTIN):", self.client_combo)
         inv_form.addRow("Invoice Date:", self.date_edit)
@@ -168,6 +196,9 @@ class InvoiceForm(QWidget):
         self.items_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.items_table.setRowCount(1)
         self.items_table.setStyleSheet("font-weight: normal;")
+        # Set minimum height to show all 5 rows without internal scroll
+        self.items_table.setMinimumHeight(200)
+        self.items_table.verticalHeader().setDefaultSectionSize(35)
         
         # Row Control Buttons
         row_btn_hbox = QHBoxLayout()
