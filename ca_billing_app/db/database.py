@@ -48,10 +48,21 @@ class DatabaseManager:
         """Apply any schema additions that older databases may be missing."""
         cursor = conn.execute("PRAGMA table_info(offices)")
         col_names = [row[1] for row in cursor.fetchall()]
+        
         if 'declaration' not in col_names:
             conn.execute("ALTER TABLE offices ADD COLUMN declaration TEXT")
             conn.commit()
             print("Migration applied: offices.declaration column added.")
+            
+        if 'invoice_format' not in col_names:
+            conn.execute("ALTER TABLE offices ADD COLUMN invoice_format TEXT DEFAULT 'A4CA/{FY}/{MM}/{SEQ}'")
+            conn.commit()
+            print("Migration applied: offices.invoice_format column added.")
+            
+        if 'initial_serial' not in col_names:
+            conn.execute("ALTER TABLE offices ADD COLUMN initial_serial INTEGER DEFAULT 0")
+            conn.commit()
+            print("Migration applied: offices.initial_serial column added.")
 
     def get_connection(self):
         """Returns a new connection object."""

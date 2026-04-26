@@ -49,7 +49,7 @@ class InvoicePDFGenerator:
         styles = getSampleStyleSheet()
         style_n = styles['Normal']
         style_b = ParagraphStyle('Bold', parent=style_n, fontName='Helvetica-Bold', fontSize=9)
-        style_h = ParagraphStyle('Header', parent=style_n, fontName='Helvetica-Bold', fontSize=14, alignment=TA_RIGHT)
+        style_h = ParagraphStyle('Header', parent=style_n, fontName='Helvetica-Bold', fontSize=14, alignment=1) # 1 = TA_CENTER
         style_s = ParagraphStyle('Small', parent=style_n, fontSize=8)
         
         # 1. HEADER SECTION (Firm Info + Title)
@@ -87,10 +87,10 @@ class InvoicePDFGenerator:
         
         # Main Header Grid
         header_data = [
-            [Table(firm_info, colWidths=[10*cm]), right_table]
+            [Table(firm_info, colWidths=[11.5*cm]), right_table]
         ]
         
-        header_table = Table(header_data, colWidths=[11*cm, 7*cm])
+        header_table = Table(header_data, colWidths=[12.5*cm, 7.0*cm])
         header_table.setStyle(TableStyle([
             # ('GRID', (0,0), (-1,-1), 1, colors.black), # Outer grid if needed
              ('VALIGN', (0,0), (-1,-1), 'TOP'),
@@ -115,7 +115,7 @@ class InvoicePDFGenerator:
             [Paragraph(f"<b>POS:</b> {pos}", style_s)]
         ]
         
-        bill_table = Table(bill_data, colWidths=[18*cm])
+        bill_table = Table(bill_data, colWidths=[19.5*cm])
         bill_table.setStyle(TableStyle([
             ('BOX', (0,0), (-1,-1), 1, colors.black),
             ('TOPPADDING', (0,0), (-1,-1), 2),
@@ -191,8 +191,9 @@ class InvoicePDFGenerator:
         ]
         rows.append(total_row)
         
-        # Column Widths (Sum to exactly 18.0cm for A4)
-        cw = [1.0*cm, 6.5*cm, 1.5*cm, 3.0*cm,  1.0*cm, 1.0*cm,  1.0*cm, 1.0*cm,  1.0*cm, 1.0*cm]
+        # Column Widths (Sum to exactly 19.5cm for A4 max space)
+        # S.No(1.0), Desc(7.0), HSN(1.5) => Total 9.5cm Split
+        cw = [1.0*cm, 7.0*cm, 1.5*cm, 3.5*cm,  1.0*cm, 1.25*cm,  1.0*cm, 1.25*cm,  1.0*cm, 1.0*cm]
         
         t = Table(rows, colWidths=cw)
         t.setStyle(TableStyle([
@@ -227,8 +228,8 @@ class InvoicePDFGenerator:
             ["Total Invoice Value (In figures)", f"{grand_total_rounded}"],
             ["Total Invoice Value (In words)", num_to_words(grand_total_rounded)]
         ]
-        # Align this table with main divisions: Col 0+1+2 = 1.0 + 6.5 + 1.5 = 9.0cm
-        tot_table = Table(tot_data, colWidths=[9.0*cm, 9.0*cm])
+        # Align this table with main divisions: Col 0+1+2 = 1.0 + 7.0 + 1.5 = 9.5cm
+        tot_table = Table(tot_data, colWidths=[9.5*cm, 10.0*cm])
         tot_table.setStyle(TableStyle([
             ('GRID', (0,0), (-1,-1), 1, colors.black),
             ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'), # Header/Figures bold
@@ -242,7 +243,7 @@ class InvoicePDFGenerator:
         
         # Reverse Charge
         rc_data = [["Whether tax is payable on reverse charge basis:", "No"]]
-        rc_table = Table(rc_data, colWidths=[9.0*cm, 9.0*cm])
+        rc_table = Table(rc_data, colWidths=[9.5*cm, 10.0*cm])
         rc_table.setStyle(TableStyle([
             ('GRID', (0,0), (-1,-1), 1, colors.black),
             ('BACKGROUND', (0,0), (0,0), colors.lightblue),
@@ -266,7 +267,7 @@ class InvoicePDFGenerator:
         
         # Signature
         sign_details = f"""
-        <b>{office['firm_name']}</b><br/><br/><br/>
+        <b>{office['firm_name']}</b><br/><br/><br/><br/><br/>
         Valid Signature<br/>
         (Authorised Signatory)
         """
@@ -275,7 +276,7 @@ class InvoicePDFGenerator:
             [Paragraph(bank_details, style_s), Paragraph(sign_details, style_s)]
         ]
         
-        footer_table = Table(footer_data, colWidths=[9.0*cm, 9.0*cm])
+        footer_table = Table(footer_data, colWidths=[9.5*cm, 10.0*cm])
         footer_table.setStyle(TableStyle([
             ('GRID', (0,0), (-1,-1), 1, colors.black),
             ('VALIGN', (0,0), (-1,-1), 'TOP'),
@@ -296,7 +297,10 @@ class InvoicePDFGenerator:
         
         if allotted_bank:
              footer_text = f"<i>Allotted by {allotted_bank}, {allotted_branch} Branch {allotted_city}</i>"
-             elements.append(Paragraph(footer_text, ParagraphStyle('Footer', parent=style_s, fontName='Helvetica-Oblique')))
+             
+             # LEFTPADDING of Tables is 6 by default. So we indent the Paragraph to perfectly align in a straight line.
+             padded_footer_style = ParagraphStyle('FooterPadded', parent=style_s, fontName='Helvetica-Oblique', leftIndent=6)
+             elements.append(Paragraph(footer_text, padded_footer_style))
 
         doc.build(elements)
         return self.invoice_path

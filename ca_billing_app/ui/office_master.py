@@ -54,8 +54,35 @@ class OfficeMaster(QWidget):
         # Row 2: Address
         self.address_input = self.create_input_group(card_layout, "Full Address", "Complete address for billing")
         
-        # Row 3: Email
-        self.email_input = self.create_input_group(card_layout, "Email Address", "Email for reports/backups")
+        # Row 3: Email & Invoice Formatting
+        row3_layout = QHBoxLayout()
+        self.email_input = self.create_input_group(row3_layout, "Email Address", "Email for reports/backups", is_row=True)
+        self.invoice_format_input = self.create_input_group(row3_layout, "Invoice Number Format", "e.g. A4CA/{FY}/{MM}/{SEQ}", is_row=True)
+        self.invoice_format_input.setText("A4CA/{FY}/{MM}/{SEQ}")
+        self.initial_serial_input = self.create_input_group(row3_layout, "Initial Serial Number", "Start from (e.g. 0)", is_row=True)
+        self.initial_serial_input.setText("0")
+        card_layout.addLayout(row3_layout)
+        
+        # Helper text for formats
+        help_text = (
+            "<b>Format Variables:</b> {FY} = Fin. Year (2526), {MM} = Month (04), {SEQ} = Serial (001)<br>"
+            "<b>Examples:</b><br>"
+            "• Type <b>A4CA/{FY}/{MM}/{SEQ}</b> to get <i>A4CA/2526/04/001</i><br>"
+            "• Type <b>DEL/{FY}/{MM}{SEQ}</b> to get <i>DEL/2526/04001</i><br>"
+            "• Type <b>MUMBAI-{SEQ}</b> to get <i>MUMBAI-001</i>"
+        )
+        help_label = QLabel(help_text)
+        help_label.setStyleSheet("color: #7f8c8d; font-size: 11px;")
+        card_layout.addWidget(help_label)
+        
+        # Real-time preview label
+        self.preview_label = QLabel("Preview: A4CA/2526/04/001")
+        self.preview_label.setStyleSheet("color: #27ae60; font-size: 13px; font-weight: bold; margin-bottom: 5px;")
+        card_layout.addWidget(self.preview_label)
+        
+        # Connect signals for live preview
+        self.invoice_format_input.textChanged.connect(self.update_preview)
+        self.initial_serial_input.textChanged.connect(self.update_preview)
         
         # Row 4: Declaration (multi-line)
         decl_lbl = QLabel("Default Declaration Text")
@@ -372,10 +399,15 @@ class OfficeMaster(QWidget):
         gstin = self.gstin_input.text().strip()
         pan = self.pan_input.text().strip()
         email = self.email_input.text().strip()
-        declaration = self.declaration_input.toPlainText().strip()
+        decl = self.declaration_input.toPlainText().strip()
+        invoice_format = self.invoice_format_input.text().strip() or "A4CA/{FY}/{MM}/{SEQ}"
         
-        if not firm_name or not address:
-            QMessageBox.warning(self, "Validation", "Firm Name and Address are required.")
+        initial_serial = 0
+        if self.initial_serial_input.text().strip().isdigit():
+            initial_serial = int(self.initial_serial_input.text().strip())
+        
+        if not firm_name or not address or not gstin or not pan:
+            QMessageBox.warning(self, "Validation", "Firm Name, Address, GSTIN, and PAN are required.")
             return
 
         conn = self.db.get_connection()
@@ -383,15 +415,15 @@ class OfficeMaster(QWidget):
             if self.current_id:
                 conn.execute("""
                     UPDATE offices 
-                    SET firm_name=?, address=?, gstin=?, pan=?, email=?, declaration=?
+                    SET firm_name=?, address=?, gstin=?, pan=?, email=?, declaration=?, invoice_format=?, initial_serial=?
                     WHERE id=?
-                """, (firm_name, address, gstin, pan, email, declaration, self.current_id))
+                """, (firm_name, address, gstin, pan, email, decl, invoice_format, initial_serial, self.current_id))
                 QMessageBox.information(self, "Success", "Business profile updated.")
             else:
                 conn.execute("""
-                    INSERT INTO offices (firm_name, address, gstin, pan, email, declaration, is_active)
-                    VALUES (?, ?, ?, ?, ?, ?, 1)
-                """, (firm_name, address, gstin, pan, email, declaration))
+                    INSERT INTO offices (firm_name, address, gstin, pan, email, declaration, invoice_format, initial_serial, is_active)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+                """, (firm_name, address, gstin, pan, email, decl, invoice_format, initial_serial))
                 QMessageBox.information(self, "Success", "Business profile saved.")
                 
             conn.commit()
@@ -473,14 +505,44 @@ class OfficeMaster(QWidget):
         layout.addLayout(btn_layout, 1)
         return card
 
+    def update_preview(self):
+        import datetime
+        now = datetime.datetime.now()
+        
+        year = now.year
+        month = now.month
+        if month >= 4:
+            fy = f"{str(year)[-2:]}{str(year + 1)[-2:]}"
+        else:
+            fy = f"{str(year - 1)[-2:]}{str(year)[-2:]}"
+            
+        month_str = now.strftime("%m")
+        
+        format_text = self.invoice_format_input.text() or "A4CA/{FY}/{MM}/{SEQ}"
+        
+        initial_serial = 0
+        if self.initial_serial_input.text().strip().isdigit():
+            initial_serial = int(self.initial_serial_input.text().strip())
+        
+        # If they start at 14, the next generated is 15. If 0, next is 1.
+        preview_serial = initial_serial + 1 if initial_serial >= 0 else 1
+        seq_str = f"{preview_serial:03d}"
+        
+        preview_text = format_text.replace('{FY}', fy).replace('{MM}', month_str).replace('{SEQ}', seq_str)
+        self.preview_label.setText(f"Preview: {preview_text}")
+
     def load_for_editing(self, row):
-        self.current_id = row['id']
-        self.firm_name_input.setText(row['firm_name'])
-        self.address_input.setText(row['address'])
-        self.gstin_input.setText(row['gstin'])
-        self.pan_input.setText(row['pan'])
-        self.email_input.setText(row['email'] or '')
-        self.declaration_input.setPlainText(row['declaration'] or DEFAULT_DECLARATION)
+        r = dict(row)
+        self.current_id = r['id']
+        self.firm_name_input.setText(r['firm_name'])
+        self.address_input.setText(r['address'])
+        self.gstin_input.setText(r['gstin'])
+        self.pan_input.setText(r['pan'])
+        self.email_input.setText(r['email'] or '')
+        self.invoice_format_input.setText(r.get('invoice_format') or "A4CA/{FY}/{MM}/{SEQ}")
+        self.initial_serial_input.setText(str(r.get('initial_serial', 0)))
+        self.update_preview()
+        self.declaration_input.setPlainText(r['declaration'] or DEFAULT_DECLARATION)
         self.save_btn.setText("Update Business Profile")
         self.save_btn.setStyleSheet("background-color: #E67E22; color: white; font-weight: bold; height: 45px; border-radius: 6px;")
 
@@ -501,6 +563,9 @@ class OfficeMaster(QWidget):
         self.gstin_input.clear()
         self.pan_input.clear()
         self.email_input.clear()
+        self.invoice_format_input.setText("A4CA/{FY}/{MM}/{SEQ}")
+        self.initial_serial_input.setText("0")
+        self.update_preview()
         self.declaration_input.setPlainText(DEFAULT_DECLARATION)
         self.save_btn.setText("Save Business Profile")
         self.save_btn.setStyleSheet("background-color: #3498DB; color: white; font-weight: bold; height: 45px; border-radius: 6px;")

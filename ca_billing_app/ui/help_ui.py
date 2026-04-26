@@ -159,8 +159,28 @@ class HelpUI(QWidget):
             "✅ <b>Cloud Synced</b> means its safe. ⚠️ <b>No Backup Detected</b> means its only on your computer."
         )
 
-        # 2. INVOICING
+        # 2. BUSINESS CONFIGURATION
+        self.add_category("⚙️ Business Configuration")
+        self.add_faq(
+            "How do I customize my invoice numbers for different businesses?",
+            "In the <b>Business Setup</b> tab, you can set the 'Invoice Number Format' for each profile using Wildcards. "
+            "For example: typing <b>{FY}/{MM}/{SEQ}</b> will automatically output <b>2526/04/001</b>. "
+            "Typing <b>MUMBAI/{SEQ}</b> will output <b>MUMBAI/001</b>. The system automatically reads these templates when generating an invoice!"
+        )
+        self.add_faq(
+            "I onboarded a client mid-year and their next invoice should be #15. How do I do this?",
+            "In the <b>Business Setup</b> tab, edit that client's profile and set the <b>'Initial Serial Number'</b> field to <b>14</b>. "
+            "The very next invoice the software generates for them will automatically be number 15."
+        )
+
+        # 3. INVOICING
         self.add_category("📝 Creating Invoices")
+        self.add_faq(
+            "I accidentally skipped some dates or serial numbers. How do I fill them in?",
+            "To generate an invoice for a past/skipped date, simply select the exact old date in the <b>'Invoice Date'</b> field. "
+            "If you also need to use a specific old missing serial number (like missing #004), type the number into the <b>'Manual Invoice Number Override'</b> field at the bottom. "
+            "The system will save it without breaking your current sequence count."
+        )
         self.add_faq(
             "How do I generate a dummy/placeholder invoice?",
             "In the 'Create Invoice' tab, look for the '3. Allotted Bank' section. Click the <b>'Generate Dummy/Placeholder'</b> button. "

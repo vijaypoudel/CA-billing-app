@@ -23,45 +23,60 @@ class InvoiceService:
         fy_str = f"{str(start_year)[-2:]}{str(end_year)[-2:]}"
         return fy_str
 
-    def generate_invoice_number(self, date_obj):
+    def generate_invoice_number(self, date_obj, office_id=None):
         """
-        Format: A4CA/FY/MM/NNNN
-        Resets every month.
-        Parses actual invoice numbers to handle custom invoice numbers correctly.
+        Format based on office configuration (Default: A4CA/FY/MM/NNNN).
+        Resets every month. Uses initial_serial if this is the first invoice of the period.
         """
         fy = self.get_financial_year(date_obj)
         month_str = date_obj.strftime("%m")
         
+        invoice_format = "A4CA/{FY}/{MM}/{SEQ}"
+        initial_serial = 0
+        
         conn = self.db.get_connection()
         try:
+            if office_id:
+                office_row = conn.execute("SELECT invoice_format, initial_serial FROM offices WHERE id = ?", (office_id,)).fetchone()
+                if office_row:
+                    r = dict(office_row)
+                    invoice_format = r.get('invoice_format') or invoice_format
+                    initial_serial = r.get('initial_serial') or initial_serial
+
             # Get ALL invoice numbers for this FY and month
             query = """
                 SELECT invoice_number 
                 FROM invoices 
-                WHERE financial_year = ? AND month_str = ?
+                WHERE financial_year = ? AND month_str = ? AND office_id = ?
             """
-            cursor = conn.execute(query, (fy, month_str))
+            cursor = conn.execute(query, (fy, month_str, office_id)) if office_id else conn.execute("SELECT invoice_number FROM invoices WHERE financial_year = ? AND month_str = ?", (fy, month_str))
             rows = cursor.fetchall()
             
-            # Parse invoice numbers to find the highest serial
-            max_serial = 0
+            max_serial = initial_serial - 1 if initial_serial > 0 else 0
+            
+            # Identify max serial from DB
             for row in rows:
                 inv_num = row['invoice_number']
-                # Format: A4CA/2526/04/0001
-                # Extract the last part (serial number)
+                # Best effort to extract serial number from the end of the string
                 try:
-                    parts = inv_num.split('/')
-                    if len(parts) == 4:
-                        serial = int(parts[3])
+                    # Look for {SEQ} location in format, but string formats vary. 
+                    # Easiest heuristic: extract numbers from the end
+                    import re
+                    match = re.search(r'(\d+)$', inv_num)
+                    if match:
+                        serial = int(match.group(1))
                         if serial > max_serial:
                             max_serial = serial
-                except (ValueError, IndexError):
-                    # Skip malformed invoice numbers
+                except Exception:
                     continue
             
             next_serial = max_serial + 1
             serial_str = f"{next_serial:03d}"
-            return f"A4CA/{fy}/{month_str}/{serial_str}", next_serial
+            
+            # Apply format replacement
+            formatted_num = invoice_format.replace('{FY}', fy).replace('{MM}', month_str).replace('{SEQ}', serial_str)
+            
+            return formatted_num, next_serial
         finally:
             conn.close()
 
@@ -83,20 +98,15 @@ class InvoiceService:
         
         if manual_invoice_number:
             invoice_number = manual_invoice_number
-            # If manual, we still need a serial number for DB consistency, 
-            # ideally we just grab the next one but don't use it in the string if overridden. 
-            # But the requirement says "Manual override allowed".
-            # To keep it simple and consistent, we'll assume the user provides the full string.
-            # We will interpret the serial number from the manual string if it matches format
-            # or just store 0/max if it breaks format to avoid collision. 
-            # Best effort parse:
-            parts = invoice_number.split('/')
-            if len(parts) == 4 and parts[3].isdigit():
-                serial_number = int(parts[3])
+            # Best effort parse for continuity
+            import re
+            match = re.search(r'(\d+)$', invoice_number)
+            if match:
+                serial_number = int(match.group(1))
             else:
                 serial_number = 9999 # Fallback
         else:
-            invoice_number, serial_number = self.generate_invoice_number(invoice_date)
+            invoice_number, serial_number = self.generate_invoice_number(invoice_date, office_id=office_id)
 
         # Calculate totals
         taxable_value = 0.0

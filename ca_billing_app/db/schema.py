@@ -21,6 +21,8 @@ def create_schema(connection):
         pan TEXT NOT NULL,
         email TEXT,
         declaration TEXT,
+        invoice_format TEXT DEFAULT 'A4CA/{FY}/{MM}/{SEQ}',
+        initial_serial INTEGER DEFAULT 0,
         is_active BOOLEAN DEFAULT 1
     );
     """)
