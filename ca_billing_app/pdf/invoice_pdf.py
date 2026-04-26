@@ -1,4 +1,5 @@
 import os
+import re
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Frame, PageTemplate
@@ -54,54 +55,74 @@ class InvoicePDFGenerator:
         
         # 1. HEADER SECTION (Firm Info + Title)
         
-        # Left Side: Firm Details
-        address_line = f"Address: {office['address']}"
-        email_line = f"E-mail: {office.get('email', '')}"
+        style_l_bold = ParagraphStyle('LeftBold', parent=style_s, fontName='Helvetica-Bold')
+        style_l_bold_firm = ParagraphStyle('LeftBoldFirm', parent=style_s, fontName='Helvetica-Bold', fontSize=10)
+
+        # Build single table to ensure perfectly aligned heights and borders
+        address_text = office.get('address', '').strip()
+        clean_address = re.sub(r'(?i)^address\s*:\s*', '', address_text)
+        row0 = [Paragraph(office['firm_name'].upper(), style_l_bold_firm), '', "Invoice No.", "Invoice Date"]
+        row1 = [Paragraph("<b>Address:</b>", style_l_bold), Paragraph(clean_address, style_s), inv['invoice_number'], inv['invoice_date']]
+        row2 = [Paragraph("<b>PAN</b>", style_l_bold), Paragraph(office['pan'], style_s), '', '']
+        row3 = [Paragraph("<b>GSTIN:</b>", style_l_bold), Paragraph(office['gstin'], style_s), '', '']
+        row4 = [Paragraph("<b>E-mail:</b>", style_l_bold), Paragraph(office.get('email', ''), style_s), '', '']
+
+        header_data = [row0, row1, row2, row3, row4]
         
-        firm_info = [
-            [Paragraph(office['firm_name'].upper(), style_b)],
-            [Paragraph(address_line, style_s)],
-            [Paragraph(f"PAN : {office['pan']}", style_s)],
-            [Paragraph(f"GSTIN : {office['gstin']}", style_s)],
-            [Paragraph(email_line, style_s)]
-        ]
+        # Total width = 19.5cm
+        # Right side = 3.5 + 3.5 = 7.0cm
+        # Left side = 19.5 - 7.0 = 12.5cm
+        # Left column splits into 2.2cm for labels, 10.3cm for values
+        header_table = Table(header_data, colWidths=[2.2*cm, 10.3*cm, 3.5*cm, 3.5*cm])
         
-        # Right Side: Invoice Details
-        inv_details = [
-            ["Invoice No.", "Invoice Date"],
-            [inv['invoice_number'], inv['invoice_date']]
-        ]
+        # Determine background color based on image (light grey)
+        bg_color = colors.HexColor('#EBEBEB')
         
-        # Combined Header Table
-        # We need a table that contains the Left Info and the Right Table
-        
-        # Create the right-side sub-table
-        right_table = Table(inv_details, colWidths=[3.5*cm, 3.5*cm])
-        right_table.setStyle(TableStyle([
-            ('GRID', (0,0), (-1,-1), 0.5, colors.black),
-            ('BACKGROUND', (0,0), (-1,0), colors.lightgrey),
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0,0), (-1,-1), 9),
-        ]))
-        
-        # Main Header Grid
-        header_data = [
-            [Table(firm_info, colWidths=[11.5*cm]), right_table]
-        ]
-        
-        header_table = Table(header_data, colWidths=[12.5*cm, 7.0*cm])
         header_table.setStyle(TableStyle([
-            # ('GRID', (0,0), (-1,-1), 1, colors.black), # Outer grid if needed
-             ('VALIGN', (0,0), (-1,-1), 'TOP'),
+            # Outer box
+            ('BOX', (0,0), (-1,-1), 1, colors.black),
+            # Vertical line separating left and right section
+            ('LINEBEFORE', (2,0), (2,-1), 1, colors.black),
+            # Vertical line between Invoice No and Invoice Date
+            ('LINEBEFORE', (3,0), (3,-1), 1, colors.black),
+            # Horizontal line separating headers and values on right side
+            ('LINEBELOW', (2,0), (3,0), 1, colors.black),
+            
+            # Left box firm name spans 2 columns
+            ('SPAN', (0,0), (1,0)), 
+            
+            # Right box values span down to match left box height
+            ('SPAN', (2,1), (2,4)), 
+            ('SPAN', (3,1), (3,4)), 
+            
+            # Background
+            ('BACKGROUND', (0,0), (-1,-1), bg_color), 
+            
+            # Alignment
+            ('VALIGN', (0,0), (-1,-1), 'TOP'),
+            ('VALIGN', (2,1), (3,4), 'MIDDLE'), # Center right side values vertically
+            ('ALIGN', (2,0), (3,-1), 'CENTER'), # Center right side text horizontally
+            
+            # Fonts for right side header
+            ('FONTNAME', (2,0), (3,0), 'Helvetica-Bold'),
+            ('FONTSIZE', (2,0), (3,0), 9),
+            
+            # Fonts for right side values
+            ('FONTNAME', (2,1), (3,-1), 'Helvetica'),
+            ('FONTSIZE', (2,1), (3,-1), 9),
+            
+            # Padding
+            ('TOPPADDING', (0,0), (-1,-1), 2),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+            ('LEFTPADDING', (0,0), (1,-1), 2), # Left padding for text labels
         ]))
         
         elements.append(Paragraph("Tax Invoice", style_h))
         elements.append(Spacer(1, 0.2*cm))
         elements.append(header_table)
         
-        # Box around top section
-        elements.append(Spacer(1, 0.2*cm))
+        # Box around top section - removed space to attach to Bill To
+        elements.append(Spacer(1, 0))
 
         # 2. BILL TO SECTION
         # Extract POS from client address if possible, else placeholder
@@ -109,20 +130,23 @@ class InvoicePDFGenerator:
         
         bill_data = [
             [Paragraph("<b>Bill To:</b>", style_n)],
-            [Paragraph(client['client_name'].upper(), style_b)],
-            [Paragraph(client['address'] or "", style_s)],
-            [Paragraph(f"<b>GSTIN: {client['gstin']}</b>", style_s)],
-            [Paragraph(f"<b>POS:</b> {pos}", style_s)]
+            [Paragraph(client['client_name'].upper(), style_n)],
+            [Paragraph(client['address'] or "", style_n)],
+            [Paragraph(f"<b>GSTIN: {client['gstin']}</b>", style_n)],
+            [Paragraph(f"<b>POS:</b> &nbsp;&nbsp;&nbsp;{pos}", style_n)]
         ]
         
         bill_table = Table(bill_data, colWidths=[19.5*cm])
         bill_table.setStyle(TableStyle([
             ('BOX', (0,0), (-1,-1), 1, colors.black),
+            ('LINEABOVE', (0,4), (0,4), 1, colors.black), # Line above POS
             ('TOPPADDING', (0,0), (-1,-1), 2),
             ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+            ('TOPPADDING', (0,4), (0,4), 4), # Extra padding for POS
+            ('BOTTOMPADDING', (0,4), (0,4), 4),
         ]))
         elements.append(bill_table)
-        elements.append(Spacer(1, 0.2*cm))
+        elements.append(Spacer(1, 0))
         
         # 3. ITEMS TABLE
         # Columns: S.No, Desc, HSN, Taxable, CGST(Rate, Amt), SGST(Rate, Amt), IGST(Rate, Amt)
@@ -214,6 +238,18 @@ class InvoicePDFGenerator:
             
             ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'), # Total Row Bold
             ('ALIGN', (1,-1), (1,-1), 'RIGHT'), # 'Total' label right align in col 1
+            
+            # Right align financial columns from row 2 (data) down to the total row
+            ('ALIGN', (3,2), (3,-1), 'RIGHT'), # Taxable Value
+            ('ALIGN', (5,2), (5,-1), 'RIGHT'), # CGST Amount
+            ('ALIGN', (7,2), (7,-1), 'RIGHT'), # SGST Amount
+            ('ALIGN', (9,2), (9,-1), 'RIGHT'), # IGST Amount
+            
+            # Add a slight right padding so they don't touch the border
+            ('RIGHTPADDING', (3,2), (3,-1), 4),
+            ('RIGHTPADDING', (5,2), (5,-1), 4),
+            ('RIGHTPADDING', (7,2), (7,-1), 4),
+            ('RIGHTPADDING', (9,2), (9,-1), 4),
         ]))
         elements.append(t)
         
@@ -225,36 +261,35 @@ class InvoicePDFGenerator:
         elements.append(Spacer(1, 0)) # No space, attach to table
         
         tot_data = [
-            ["Total Invoice Value (In figures)", f"{grand_total_rounded}"],
-            ["Total Invoice Value (In words)", num_to_words(grand_total_rounded)]
+            [Paragraph("<i>Total Invoice Value (In figures)</i>", style_s), f"{grand_total_rounded}"],
+            [Paragraph("<i>Total Invoice Value (In words)</i>", style_s), Paragraph(num_to_words(grand_total_rounded), ParagraphStyle('CenterBold', parent=style_s, alignment=1, fontName='Helvetica-Bold'))]
         ]
-        # Align this table with main divisions: Col 0+1+2 = 1.0 + 7.0 + 1.5 = 9.5cm
-        tot_table = Table(tot_data, colWidths=[9.5*cm, 10.0*cm])
+        # Align this table with main divisions: Col 0+1+2+3 = 1.0 + 7.0 + 1.5 + 3.5 = 13.0cm
+        tot_table = Table(tot_data, colWidths=[13.0*cm, 6.5*cm])
         tot_table.setStyle(TableStyle([
             ('GRID', (0,0), (-1,-1), 1, colors.black),
-            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'), # Header/Figures bold
-            ('FontSize', (0,0), (-1,-1), 9),
-            ('ALIGN', (1,0), (1,0), 'RIGHT'), # Figures right align
-            ('ALIGN', (1,1), (1,1), 'LEFT'), # Words left align
-            ('FONTNAME', (0,1), (-1,1), 'Helvetica'), # Words row NOT bold
-            ('FONTSIZE', (0,1), (-1,1), 8), # Smaller font for words to prevent overflow
+            ('FONTNAME', (0,0), (-1,-1), 'Helvetica-Bold'), # Values are bold
+            ('FONTSIZE', (0,0), (-1,-1), 9),
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'), # Center align both labels and values
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('LEFTPADDING', (0,0), (0,-1), 10), # Add some padding from left border for the labels
         ]))
         elements.append(tot_table)
         
         # Reverse Charge
-        rc_data = [["Whether tax is payable on reverse charge basis:", "No"]]
-        rc_table = Table(rc_data, colWidths=[9.5*cm, 10.0*cm])
+        elements.append(Spacer(1, 0)) # attach to table
+        rc_data = [[Paragraph("<i>Whether tax is payable on reverse charge basis:</i>", style_s), Paragraph("<i>No</i>", style_s)]]
+        rc_table = Table(rc_data, colWidths=[13.0*cm, 6.5*cm])
         rc_table.setStyle(TableStyle([
             ('GRID', (0,0), (-1,-1), 1, colors.black),
-            ('BACKGROUND', (0,0), (0,0), colors.lightblue),
             ('FONTSIZE', (0,0), (-1,-1), 9),
-            ('FONTNAME', (0,0), (0,0), 'Helvetica-Oblique'),
-            ('ALIGN', (1,0), (1,0), 'LEFT'),
+            ('ALIGN', (0,0), (-1,-1), 'LEFT'), # Left align labels
+            ('LEFTPADDING', (0,0), (-1,-1), 10), # Add some padding from left border
         ]))
         elements.append(rc_table)
         
         # 5. FOOTER (Declaration & Bank)
-        elements.append(Spacer(1, 0.2*cm))
+        elements.append(Spacer(1, 0)) # attach to table
         
         # Declaration: use per-invoice override → office saved → hardcoded default
         if declaration_text and declaration_text.strip():
@@ -266,6 +301,7 @@ class InvoicePDFGenerator:
         bank_details = f"<b>Declaration:</b><br/>{decl_body}"
         
         # Signature
+        style_c_small = ParagraphStyle('CenterSmall', parent=style_s, alignment=1) # 1=TA_CENTER
         sign_details = f"""
         <b>{office['firm_name']}</b><br/><br/><br/><br/><br/>
         Valid Signature<br/>
@@ -273,10 +309,10 @@ class InvoicePDFGenerator:
         """
         
         footer_data = [
-            [Paragraph(bank_details, style_s), Paragraph(sign_details, style_s)]
+            [Paragraph(bank_details, style_s), Paragraph(sign_details, style_c_small)]
         ]
         
-        footer_table = Table(footer_data, colWidths=[9.5*cm, 10.0*cm])
+        footer_table = Table(footer_data, colWidths=[13.0*cm, 6.5*cm])
         footer_table.setStyle(TableStyle([
             ('GRID', (0,0), (-1,-1), 1, colors.black),
             ('VALIGN', (0,0), (-1,-1), 'TOP'),
