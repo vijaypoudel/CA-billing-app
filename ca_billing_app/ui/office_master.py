@@ -5,11 +5,18 @@ import platform
 import shutil
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, 
                                QLineEdit, QPushButton, QMessageBox, QLabel, 
-                               QGroupBox, QScrollArea, QFrame, QFileDialog)
+                               QGroupBox, QScrollArea, QFrame, QFileDialog, QTextEdit)
 from PySide6.QtCore import Qt, Slot
 from db.database import db_manager
 from config_manager import config_manager
 import subprocess
+
+DEFAULT_DECLARATION = (
+    "1. All the details mentioned in the invoice are true and correct.\n"
+    "2. Please transfer the fee in our Account- Ankita Agarwal & Associates\n"
+    "maintained at Bank of Baroda, IFSC: BARB0DILSHA Account No.\n"
+    "31680200002026."
+)
 
 class OfficeMaster(QWidget):
     def __init__(self):
@@ -49,6 +56,30 @@ class OfficeMaster(QWidget):
         
         # Row 3: Email
         self.email_input = self.create_input_group(card_layout, "Email Address", "Email for reports/backups")
+        
+        # Row 4: Declaration (multi-line)
+        decl_lbl = QLabel("Default Declaration Text")
+        decl_lbl.setStyleSheet("font-weight: bold; color: #34495e; font-size: 12px;")
+        self.declaration_input = QTextEdit()
+        self.declaration_input.setPlaceholderText(
+            "Enter the default declaration text that will appear on every invoice...\n"
+            "e.g. 1. All details are true and correct.\n"
+            "2. Please transfer the fee to Account No. XXXX..."
+        )
+        self.declaration_input.setMinimumHeight(90)
+        self.declaration_input.setMaximumHeight(120)
+        self.declaration_input.setStyleSheet("""
+            QTextEdit {
+                border: 1px solid #dcdde1;
+                border-radius: 5px;
+                padding: 6px 10px;
+                background-color: #fcfcfc;
+                font-size: 12px;
+            }
+            QTextEdit:focus { border: 1px solid #3498DB; background-color: #fff; }
+        """)
+        card_layout.addWidget(decl_lbl)
+        card_layout.addWidget(self.declaration_input)
         
         # Buttons
         btn_layout = QHBoxLayout()
@@ -142,8 +173,26 @@ class OfficeMaster(QWidget):
         
         path_layout.addWidget(self.db_path_lbl, 3)
         path_layout.addWidget(self.change_path_btn, 1)
-        
         storage_layout.addLayout(path_layout)
+
+        # -- Invoice Storage Folder Row --
+        inv_path_layout = QHBoxLayout()
+        self.storage_folder_lbl = QLabel(f"Invoice Output Folder: {config_manager.get_storage_folder()}")
+        self.storage_folder_lbl.setStyleSheet("color: #7f8c8d; font-size: 11px;")
+        self.storage_folder_lbl.setWordWrap(True)
+        
+        self.change_storage_btn = QPushButton("📁 Change Folder")
+        self.change_storage_btn.setFixedHeight(30)
+        self.change_storage_btn.clicked.connect(self.change_storage_folder)
+        self.change_storage_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #27AE60; color: white; border-radius: 4px; padding: 0 15px; font-size: 11px;
+            }
+            QPushButton:hover { background-color: #229954; }
+        """)
+        inv_path_layout.addWidget(self.storage_folder_lbl, 3)
+        inv_path_layout.addWidget(self.change_storage_btn, 1)
+        storage_layout.addLayout(inv_path_layout)
         
         self.main_layout.addWidget(storage_card)
         self.update_sync_status()
@@ -181,6 +230,60 @@ class OfficeMaster(QWidget):
             self.sync_status_lbl.setText("💾 Local Storage")
             self.sync_status_lbl.setStyleSheet("color: #7f8c8d; font-size: 11px;")
 
+    def _check_backup_safety(self, path):
+        """
+        Returns (is_safe: bool, label: str) based on whether path appears
+        to be inside a cloud-synced directory.
+        """
+        p = path.lower()
+        cloud_hints = [
+            ("google drive", "☁️ Google Drive"),
+            ("googledrive", "☁️ Google Drive"),
+            ("onedrive", "☁️ OneDrive"),
+            ("dropbox", "☁️ Dropbox"),
+            ("icloud", "☁️ iCloud"),
+            ("mobile documents", "☁️ iCloud"),  # macOS iCloud path
+            ("box sync", "☁️ Box"),
+            ("pcloud", "☁️ pCloud"),
+        ]
+        for hint, label in cloud_hints:
+            if hint in p:
+                return True, label
+        return False, "💾 Local Storage (No Backup Detected)"
+
+    def change_storage_folder(self):
+        new_dir = QFileDialog.getExistingDirectory(
+            self, "Select Invoice Output Folder", config_manager.get_storage_folder()
+        )
+        if not new_dir:
+            return
+
+        is_safe, backup_label = self._check_backup_safety(new_dir)
+        if not is_safe:
+            reply = QMessageBox.warning(
+                self, "⚠️ Backup Risk — Please Read Carefully",
+                "<b>The folder you selected does not appear to be backed up to the cloud.</b><br><br>"
+                "Invoices are critical financial records. If your computer is lost, damaged, or "
+                "stolen, you will lose all your invoices permanently.<br><br>"
+                "<b>We strongly recommend choosing a folder inside:</b><br>"
+                "• Google Drive<br>• OneDrive<br>• Dropbox<br>• iCloud Drive<br><br>"
+                "Are you sure you want to use this local folder? <b>You accept full responsibility "
+                "for backing up your invoices.</b>",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
+            if reply == QMessageBox.No:
+                return
+
+        config_manager.set_storage_folder(new_dir)
+        self.storage_folder_lbl.setText(f"Invoice Output Folder: {new_dir}  |  {backup_label}")
+        if is_safe:
+            QMessageBox.information(self, "✅ Saved",
+                f"Invoice folder set to:\n{new_dir}\n\n{backup_label} detected — your invoices will be automatically backed up!")
+        else:
+            QMessageBox.information(self, "Saved — Remember to Back Up!",
+                f"Invoice folder set to:\n{new_dir}\n\n⚠️ This folder is not cloud-synced. Please ensure you back up regularly.")
+
     def change_db_location(self):
         new_dir = QFileDialog.getExistingDirectory(self, "Select Folder to Store Database", os.path.expanduser("~"))
         if not new_dir:
@@ -191,27 +294,43 @@ class OfficeMaster(QWidget):
         
         if new_path == old_path:
             return
+
+        is_safe, backup_label = self._check_backup_safety(new_dir)
+        if not is_safe:
+            reply = QMessageBox.warning(
+                self, "⚠️ Backup Risk — Please Read Carefully",
+                "<b>The folder you selected does not appear to be backed up to the cloud.</b><br><br>"
+                "Your database contains ALL your client records, invoices, and payment history. "
+                "If your computer is lost or damaged, you will lose everything permanently.<br><br>"
+                "<b>We strongly recommend choosing a folder inside:</b><br>"
+                "• Google Drive<br>• OneDrive<br>• Dropbox<br>• iCloud Drive<br><br>"
+                "Are you sure you want to use this local folder? <b>You accept full responsibility "
+                "for backing up your data.</b>",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
+            if reply == QMessageBox.No:
+                return
             
         if QMessageBox.question(self, "Relocate Data", 
                                 f"Move your database to:\n{new_path}?\n\nThis will transfer all your current records.",
                                 QMessageBox.Yes | QMessageBox.No) == QMessageBox.Yes:
             try:
-                # 1. Close any existing connections by just letting them be handled by the next get_connection
-                # 2. Copy the file
                 if os.path.exists(old_path):
-                    # Ensure destination directory exists
                     if not os.path.exists(new_dir):
                         os.makedirs(new_dir)
                     shutil.copy2(old_path, new_path)
                 
-                # 3. Update config
                 config_manager.set_db_path(new_path)
-                
-                # 4. Update UI
-                self.db_path_lbl.setText(f"Current Database Path: {new_path}")
+                self.db_path_lbl.setText(f"Current Database Path: {new_path}  |  {backup_label}")
                 self.update_sync_status()
                 
-                QMessageBox.information(self, "Success", "Database successfully relocated!")
+                if is_safe:
+                    QMessageBox.information(self, "✅ Success",
+                        f"Database relocated!\n\n{backup_label} detected — your data will be automatically backed up.")
+                else:
+                    QMessageBox.information(self, "Moved — Remember to Back Up!",
+                        "Database relocated.\n\n⚠️ This folder is not cloud-synced. Please back up billing.db regularly.")
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Failed to relocate database: {e}")
 
@@ -253,6 +372,7 @@ class OfficeMaster(QWidget):
         gstin = self.gstin_input.text().strip()
         pan = self.pan_input.text().strip()
         email = self.email_input.text().strip()
+        declaration = self.declaration_input.toPlainText().strip()
         
         if not firm_name or not address:
             QMessageBox.warning(self, "Validation", "Firm Name and Address are required.")
@@ -263,15 +383,15 @@ class OfficeMaster(QWidget):
             if self.current_id:
                 conn.execute("""
                     UPDATE offices 
-                    SET firm_name=?, address=?, gstin=?, pan=?, email=?
+                    SET firm_name=?, address=?, gstin=?, pan=?, email=?, declaration=?
                     WHERE id=?
-                """, (firm_name, address, gstin, pan, email, self.current_id))
+                """, (firm_name, address, gstin, pan, email, declaration, self.current_id))
                 QMessageBox.information(self, "Success", "Business profile updated.")
             else:
                 conn.execute("""
-                    INSERT INTO offices (firm_name, address, gstin, pan, email, is_active)
-                    VALUES (?, ?, ?, ?, ?, 1)
-                """, (firm_name, address, gstin, pan, email))
+                    INSERT INTO offices (firm_name, address, gstin, pan, email, declaration, is_active)
+                    VALUES (?, ?, ?, ?, ?, ?, 1)
+                """, (firm_name, address, gstin, pan, email, declaration))
                 QMessageBox.information(self, "Success", "Business profile saved.")
                 
             conn.commit()
@@ -359,7 +479,8 @@ class OfficeMaster(QWidget):
         self.address_input.setText(row['address'])
         self.gstin_input.setText(row['gstin'])
         self.pan_input.setText(row['pan'])
-        self.email_input.setText(row['email'])
+        self.email_input.setText(row['email'] or '')
+        self.declaration_input.setPlainText(row['declaration'] or DEFAULT_DECLARATION)
         self.save_btn.setText("Update Business Profile")
         self.save_btn.setStyleSheet("background-color: #E67E22; color: white; font-weight: bold; height: 45px; border-radius: 6px;")
 
@@ -380,5 +501,6 @@ class OfficeMaster(QWidget):
         self.gstin_input.clear()
         self.pan_input.clear()
         self.email_input.clear()
+        self.declaration_input.setPlainText(DEFAULT_DECLARATION)
         self.save_btn.setText("Save Business Profile")
         self.save_btn.setStyleSheet("background-color: #3498DB; color: white; font-weight: bold; height: 45px; border-radius: 6px;")

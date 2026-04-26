@@ -174,10 +174,6 @@ class InvoiceList(QWidget):
             edit_act.setEnabled(not is_paid)  # Freeze if paid
             edit_act.triggered.connect(lambda _, rid=inv_id: self.edit_invoice(rid))
             
-            status_act = menu.addAction("Change Status")
-            status_act.setEnabled(not is_paid)  # Freeze if paid
-            status_act.triggered.connect(lambda _, rid=inv_id: self.change_status(rid))
-            
             pay_act = menu.addAction("Add Payment")
             pay_act.setEnabled(not is_paid)  # Freeze if paid - already fully paid
             pay_act.triggered.connect(lambda _, rid=inv_id: self.open_payment_dialog(rid))
@@ -266,34 +262,4 @@ class InvoiceList(QWidget):
         if dialog.exec() == QDialog.Accepted:
             # Refresh list if changes were saved
             self.load_invoices()
-    
-    def change_status(self, invoice_id):
-        """Allow manual status change"""
-        conn = self.db.get_connection()
-        try:
-            # Get current status
-            current = conn.execute("SELECT status, invoice_number FROM invoices WHERE id=?", (invoice_id,)).fetchone()
-            if not current:
-                return
-            
-            statuses = ["Generated", "Paid", "Partially Paid", "Cancelled"]
-            status, ok = QInputDialog.getItem(
-                self, 
-                "Change Status", 
-                f"Invoice: {current['invoice_number']}\n\nSelect new status:",
-                statuses,
-                statuses.index(current['status']) if current['status'] in statuses else 0,
-                False
-            )
-            
-            if ok and status:
-                conn.execute("UPDATE invoices SET status=? WHERE id=?", (status, invoice_id))
-                conn.commit()
-                QMessageBox.information(self, "Success", f"Status changed to: {status}")
-                self.load_invoices()
-                
-        except Exception as e:
-            QMessageBox.critical(self, "Error", str(e))
-        finally:
-            conn.close()
 

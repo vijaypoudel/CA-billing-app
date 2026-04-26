@@ -38,7 +38,20 @@ class DatabaseManager:
         # Connect and initialize schema if new
         conn = sqlite3.connect(self.db_path)
         create_schema(conn)
+        
+        # Runtime migrations for existing databases
+        self._run_migrations(conn)
+        
         conn.close()
+
+    def _run_migrations(self, conn):
+        """Apply any schema additions that older databases may be missing."""
+        cursor = conn.execute("PRAGMA table_info(offices)")
+        col_names = [row[1] for row in cursor.fetchall()]
+        if 'declaration' not in col_names:
+            conn.execute("ALTER TABLE offices ADD COLUMN declaration TEXT")
+            conn.commit()
+            print("Migration applied: offices.declaration column added.")
 
     def get_connection(self):
         """Returns a new connection object."""

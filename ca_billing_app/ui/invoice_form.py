@@ -2,13 +2,14 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
                                QLineEdit, QPushButton, QTableWidget, QTableWidgetItem, 
                                QHeaderView, QMessageBox, QLabel, QComboBox, QDateEdit, 
                                QCompleter, QCheckBox, QTextEdit, QGroupBox, QFrame,
-                               QScrollArea)
+                               QScrollArea, QSizePolicy)
 from PySide6.QtCore import Qt, QDate, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtCore import QUrl
 from db.database import db_manager
 from services.invoice_service import InvoiceService
 from pdf.invoice_pdf import InvoicePDFGenerator
+from config_manager import config_manager
 import datetime
 
 class InvoiceForm(QWidget):
@@ -139,12 +140,13 @@ class InvoiceForm(QWidget):
         top_hbox.addWidget(invoice_details_group, 6)
         self.layout.addLayout(top_hbox)
 
-        # --- Middle Section: Bank Details & Sequence (STREMLINED) ---
+        # --- Middle Section: Bank Details (STREAMLINED) ---
         mid_layout = QHBoxLayout()
         
         # Bank Selector
         bank_group = QGroupBox("3. Allotted Bank (For Footer)")
         bank_group.setStyleSheet("font-weight: bold; color: #34495E;")
+        bank_group.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
         bank_hbox = QHBoxLayout(bank_group)
         
         self.bank_combo = QComboBox()
@@ -167,6 +169,7 @@ class InvoiceForm(QWidget):
         if not is_update_mode:
             dummy_group = QGroupBox("Generate Dummy Invoice")
             dummy_group.setStyleSheet("font-weight: bold; color: #34495E;")
+            dummy_group.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
             dummy_vbox = QVBoxLayout(dummy_group)
             self.skip_number_btn = QPushButton("Generate Dummy/Placeholder")
             self.skip_number_btn.setStyleSheet("""
@@ -183,6 +186,7 @@ class InvoiceForm(QWidget):
             dummy_vbox.addWidget(self.skip_number_btn)
             mid_layout.addWidget(dummy_group, 3)
 
+        mid_layout.addStretch()
         self.layout.addLayout(mid_layout)
 
         # --- Items Section ---
@@ -220,6 +224,28 @@ class InvoiceForm(QWidget):
         items_vbox.addWidget(self.items_table)
         items_vbox.addLayout(row_btn_hbox)
         self.layout.addWidget(items_group)
+        
+        # --- Declaration Section ---
+        decl_group = QGroupBox("5. Declaration (editable per invoice)")
+        decl_group.setStyleSheet("font-weight: bold; color: #34495E;")
+        decl_vbox = QVBoxLayout(decl_group)
+        decl_hint = QLabel("Pre-filled from Business Setup. Edit here to customise for this invoice only.")
+        decl_hint.setStyleSheet("font-weight: normal; color: #7F8C8D; font-size: 11px;")
+        self.declaration_edit = QTextEdit()
+        self.declaration_edit.setMinimumHeight(80)
+        self.declaration_edit.setMaximumHeight(110)
+        self.declaration_edit.setStyleSheet("""
+            QTextEdit {
+                font-weight: normal;
+                border: 1px solid #D5DBDB;
+                border-radius: 4px;
+                padding: 6px;
+                background-color: #FDFEFE;
+            }
+        """)
+        decl_vbox.addWidget(decl_hint)
+        decl_vbox.addWidget(self.declaration_edit)
+        self.layout.addWidget(decl_group)
         
         # --- Bottom Section: Totals & Generate ---
         bottom_hbox = QHBoxLayout()
@@ -265,6 +291,7 @@ class InvoiceForm(QWidget):
         self.load_banks()
         self.load_offices()
         self.load_clients()
+        self.load_declaration_default()
 
     def check_db_schema(self):
         conn = self.db.get_connection()
@@ -331,6 +358,27 @@ class InvoiceForm(QWidget):
         if oid in self.office_data:
             self.office_display.setText(self.office_data[oid]['display_text'])
             self.auto_select_tax_type()
+            self.load_declaration_default()
+
+    def load_declaration_default(self):
+        """Pre-fill the declaration box from the selected office's saved default."""
+        oid = self.office_combo.currentData()
+        if not oid:
+            return
+        conn = self.db.get_connection()
+        try:
+            row = conn.execute("SELECT declaration FROM offices WHERE id=?", (oid,)).fetchone()
+            if row and row['declaration']:
+                self.declaration_edit.setPlainText(row['declaration'])
+            else:
+                self.declaration_edit.setPlaceholderText(
+                    "No default declaration set. Go to Business Setup to add one, or type here."
+                )
+                self.declaration_edit.clear()
+        except Exception:
+            pass
+        finally:
+            conn.close()
 
     def auto_select_tax_type(self):
         """Auto-select IGST vs CGST_SGST based on first 2 digits of GSTINs"""
@@ -548,7 +596,7 @@ class InvoiceForm(QWidget):
                     # 2. Archive existing PDF if it exists
                     if old_pdf_path and os.path.exists(old_pdf_path):
                         desktop = os.path.join(os.path.expanduser("~"), "Desktop")
-                        deleted_dir = os.path.join(desktop, "AnkitaCA", "Generated Invoices", "DELETED_Invoices")
+                        deleted_dir = os.path.join(config_manager.get_storage_folder(), "Generated Invoices", "DELETED_Invoices")
                         if not os.path.exists(deleted_dir):
                             os.makedirs(deleted_dir)
                             
@@ -601,7 +649,8 @@ class InvoiceForm(QWidget):
                 
                 # 5. Regenerate PDF
                 inv_details = self.invoice_service.get_invoice_details(inv_id)
-                pdf_path = self.pdf_generator.generate(inv_details)
+                declaration_text = self.declaration_edit.toPlainText().strip()
+                pdf_path = self.pdf_generator.generate(inv_details, declaration_text=declaration_text)
                 
                 # Update path in DB
                 conn = self.db.get_connection()
@@ -622,7 +671,8 @@ class InvoiceForm(QWidget):
                 
                 # Generate PDF
                 inv_details = self.invoice_service.get_invoice_details(inv_id)
-                pdf_path = self.pdf_generator.generate(inv_details)
+                declaration_text = self.declaration_edit.toPlainText().strip()
+                pdf_path = self.pdf_generator.generate(inv_details, declaration_text=declaration_text)
                 
                 # Save PDF path to DB
                 conn = self.db.get_connection()

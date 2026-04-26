@@ -20,6 +20,7 @@ def create_schema(connection):
         gstin TEXT NOT NULL,
         pan TEXT NOT NULL,
         email TEXT,
+        declaration TEXT,
         is_active BOOLEAN DEFAULT 1
     );
     """)
@@ -32,7 +33,8 @@ def create_schema(connection):
         client_name TEXT NOT NULL,
         address TEXT,
         email TEXT,
-        phone TEXT
+        phone TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
     """)
 

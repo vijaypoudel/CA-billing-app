@@ -60,7 +60,7 @@ class InvoiceService:
                     continue
             
             next_serial = max_serial + 1
-            serial_str = f"{next_serial:04d}"
+            serial_str = f"{next_serial:03d}"
             return f"A4CA/{fy}/{month_str}/{serial_str}", next_serial
         finally:
             conn.close()

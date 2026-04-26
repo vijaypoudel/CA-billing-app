@@ -7,6 +7,9 @@ CONFIG_FILE = os.path.join(CONFIG_DIR, "settings.json")
 def get_default_db_path():
     return os.path.join(os.path.expanduser("~"), "Documents", "AnkitaCA", "data", "billing.db")
 
+def get_default_storage_folder():
+    return os.path.join(os.path.expanduser("~"), "Desktop", "AnkitaCA")
+
 class ConfigManager:
     def __init__(self):
         self.ensure_config_dir()
@@ -27,6 +30,7 @@ class ConfigManager:
         # Default settings
         defaults = {
             "database_path": get_default_db_path(),
+            "storage_folder": get_default_storage_folder(),
             "last_backup_date": None
         }
         self.save_settings(defaults)
@@ -43,6 +47,13 @@ class ConfigManager:
 
     def set_db_path(self, path):
         self.settings["database_path"] = path
+        self.save_settings()
+
+    def get_storage_folder(self):
+        return self.settings.get("storage_folder", get_default_storage_folder())
+
+    def set_storage_folder(self, path):
+        self.settings["storage_folder"] = path
         self.save_settings()
 
 # Global instance

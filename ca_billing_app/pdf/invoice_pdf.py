@@ -6,14 +6,22 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
 from utils.num_wrapper import num_to_words
+from config_manager import config_manager
 
 INVOICE_ROOT = "Invoices"
+
+DEFAULT_DECLARATION = (
+    "1. All the details mentioned in the invoice are true and correct.<br/>"
+    "2. Please transfer the fee in our Account- Ankita Agarwal &amp; Associates<br/>"
+    "maintained at Bank of Baroda, IFSC: BARB0DILSHA Account No.<br/>"
+    "31680200002026."
+)
 
 class InvoicePDFGenerator:
     def __init__(self):
         self.invoice_path = None
 
-    def generate(self, invoice_data):
+    def generate(self, invoice_data, declaration_text=None):
         inv = invoice_data['invoice']
         client = invoice_data['client']
         office = invoice_data['office']
@@ -23,9 +31,9 @@ class InvoicePDFGenerator:
         fy = inv['financial_year']
         month = inv['month_str']
         
-        # New Desktop Path Structure: ~/Desktop/AnkitaCA/Generated Invoices/{FY}/{Month}/
-        desktop = os.path.join(os.path.expanduser("~"), "Desktop")
-        dir_path = os.path.join(desktop, "AnkitaCA", "Generated Invoices", fy, month)
+        # Use user-configured storage folder (default: ~/Desktop/AnkitaCA)
+        storage_root = config_manager.get_storage_folder()
+        dir_path = os.path.join(storage_root, "Generated Invoices", fy, month)
         
         if not os.path.exists(dir_path):
             os.makedirs(dir_path)
@@ -183,9 +191,8 @@ class InvoicePDFGenerator:
         ]
         rows.append(total_row)
         
-        # Column Widths
-        # Total width approx 18-19cm
-        cw = [1*cm, 6*cm, 1.5*cm, 2.5*cm,  1.2*cm, 1.8*cm,  1.2*cm, 1.8*cm,  1.2*cm, 1.8*cm]
+        # Column Widths (Sum to exactly 18.0cm for A4)
+        cw = [1.0*cm, 6.5*cm, 1.5*cm, 3.0*cm,  1.0*cm, 1.0*cm,  1.0*cm, 1.0*cm,  1.0*cm, 1.0*cm]
         
         t = Table(rows, colWidths=cw)
         t.setStyle(TableStyle([
@@ -205,7 +212,7 @@ class InvoicePDFGenerator:
             ('SPAN', (8,0), (9,0)), # IGST Header
             
             ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'), # Total Row Bold
-            ('SPAN', (0,-1), (0,-1)), # Total Label Span? Actually Col 1 is 'Total', Col 0 empty
+            ('ALIGN', (1,-1), (1,-1), 'RIGHT'), # 'Total' label right align in col 1
         ]))
         elements.append(t)
         
@@ -220,7 +227,8 @@ class InvoicePDFGenerator:
             ["Total Invoice Value (In figures)", f"{grand_total_rounded}"],
             ["Total Invoice Value (In words)", num_to_words(grand_total_rounded)]
         ]
-        tot_table = Table(tot_data, colWidths=[9*cm, 9*cm])
+        # Align this table with main divisions: Col 0+1+2 = 1.0 + 6.5 + 1.5 = 9.0cm
+        tot_table = Table(tot_data, colWidths=[9.0*cm, 9.0*cm])
         tot_table.setStyle(TableStyle([
             ('GRID', (0,0), (-1,-1), 1, colors.black),
             ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'), # Header/Figures bold
@@ -234,26 +242,27 @@ class InvoicePDFGenerator:
         
         # Reverse Charge
         rc_data = [["Whether tax is payable on reverse charge basis:", "No"]]
-        rc_table = Table(rc_data, colWidths=[9*cm, 9*cm])
+        rc_table = Table(rc_data, colWidths=[9.0*cm, 9.0*cm])
         rc_table.setStyle(TableStyle([
             ('GRID', (0,0), (-1,-1), 1, colors.black),
             ('BACKGROUND', (0,0), (0,0), colors.lightblue),
             ('FONTSIZE', (0,0), (-1,-1), 9),
             ('FONTNAME', (0,0), (0,0), 'Helvetica-Oblique'),
+            ('ALIGN', (1,0), (1,0), 'LEFT'),
         ]))
         elements.append(rc_table)
         
         # 5. FOOTER (Declaration & Bank)
         elements.append(Spacer(1, 0.2*cm))
         
-        # Bank Details - Hardcoded from image/requirements or placeholders
-        bank_details = """
-        <b>Declaration:</b><br/>
-        1. All the details mentioned in the invoice are true and correct.<br/>
-        2. Please transfer the fee in our Account- Ankita Agarwal & Associates<br/>
-        maintained at Bank of Baroda, IFSC: BARB0DILSHA Account No.<br/>
-        31680200002026.
-        """
+        # Declaration: use per-invoice override → office saved → hardcoded default
+        if declaration_text and declaration_text.strip():
+            decl_body = declaration_text.strip().replace('\n', '<br/>')
+        elif office.get('declaration') and office['declaration'].strip():
+            decl_body = office['declaration'].strip().replace('\n', '<br/>')
+        else:
+            decl_body = DEFAULT_DECLARATION
+        bank_details = f"<b>Declaration:</b><br/>{decl_body}"
         
         # Signature
         sign_details = f"""
@@ -266,7 +275,7 @@ class InvoicePDFGenerator:
             [Paragraph(bank_details, style_s), Paragraph(sign_details, style_s)]
         ]
         
-        footer_table = Table(footer_data, colWidths=[10*cm, 8*cm])
+        footer_table = Table(footer_data, colWidths=[9.0*cm, 9.0*cm])
         footer_table.setStyle(TableStyle([
             ('GRID', (0,0), (-1,-1), 1, colors.black),
             ('VALIGN', (0,0), (-1,-1), 'TOP'),

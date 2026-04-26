@@ -7,6 +7,7 @@ from ui.client_master import ClientMaster
 from ui.branch_master import BranchMaster
 from ui.office_master import OfficeMaster
 from ui.reporting_ui import ReportingUI
+from ui.help_ui import HelpUI
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -38,6 +39,19 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.invoice_form, "Create Invoice")
         self.tabs.addTab(self.invoice_list, "Update Invoice")
         self.tabs.addTab(ReportingUI(), "Reports")
+        self.tabs.addTab(HelpUI(), "Help & FAQ")
+        
+        self.tabs.currentChanged.connect(self.handle_tab_change)
+    
+    def handle_tab_change(self, index):
+        """Auto-refresh specifically when landing on certain tabs"""
+        tab_text = self.tabs.tabText(index)
+        if tab_text == "Update Invoice":
+            self.invoice_list.load_invoices()
+        elif tab_text == "Create Invoice":
+            self.invoice_form.load_clients() # Refresh client list in case new ones added
+            self.invoice_form.load_offices()
+            self.invoice_form.load_declaration_default()
     
     def edit_invoice_by_id(self, invoice_id):
         # We'll use a dialog for editing now, which will be initiated from InvoiceList

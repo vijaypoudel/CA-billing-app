@@ -168,11 +168,16 @@ class ClientMaster(QWidget):
         conn = self.db.get_connection()
         try:
             if self.current_gstin:
-                conn.execute("UPDATE clients SET gstin=?, client_name=?, address=?, email=?, phone=? WHERE gstin=?", 
-                             (gstin, name, address, email, phone, self.current_gstin))
+                conn.execute("""
+                    UPDATE clients 
+                    SET gstin=?, client_name=?, address=?, email=?, phone=? 
+                    WHERE gstin=?
+                """, (gstin, name, address, email, phone, self.current_gstin))
             else:
-                conn.execute("INSERT INTO clients VALUES (?, ?, ?, ?, ?)", 
-                             (gstin, name, address, email, phone))
+                conn.execute("""
+                    INSERT INTO clients (gstin, client_name, address, email, phone) 
+                    VALUES (?, ?, ?, ?, ?)
+                """, (gstin, name, address, email, phone))
             conn.commit()
             self.clear_form()
             self.refresh_table()
