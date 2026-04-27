@@ -216,8 +216,8 @@ class InvoicePDFGenerator:
         rows.append(total_row)
         
         # Column Widths (Sum to exactly 19.5cm for A4 max space)
-        # S.No(1.0), Desc(7.0), HSN(1.5) => Total 9.5cm Split
-        cw = [1.0*cm, 7.0*cm, 1.5*cm, 3.5*cm,  1.0*cm, 1.25*cm,  1.0*cm, 1.25*cm,  1.0*cm, 1.0*cm]
+        # S.No(1.0), Desc(8.0), HSN(1.5), Taxable Value(2.5) => Total 13.0cm Split
+        cw = [1.0*cm, 8.0*cm, 1.5*cm, 2.5*cm,  1.0*cm, 1.25*cm,  1.0*cm, 1.25*cm,  1.0*cm, 1.0*cm]
         
         t = Table(rows, colWidths=cw)
         t.setStyle(TableStyle([
@@ -302,21 +302,25 @@ class InvoicePDFGenerator:
         
         # Signature
         style_c_small = ParagraphStyle('CenterSmall', parent=style_s, alignment=1) # 1=TA_CENTER
-        sign_details = f"""
-        <b>{office['firm_name']}</b><br/><br/><br/><br/><br/>
-        Valid Signature<br/>
-        (Authorised Signatory)
-        """
+        firm_name_p = Paragraph(f"<b>{office['firm_name']}</b>", style_c_small)
+        sig_p = Paragraph("<br/>"*4 + "Valid Signature<br/>(Authorised Signatory)", style_c_small)
         
         footer_data = [
-            [Paragraph(bank_details, style_s), Paragraph(sign_details, style_c_small)]
+            [Paragraph(bank_details, style_s), firm_name_p],
+            ['', sig_p]
         ]
         
         footer_table = Table(footer_data, colWidths=[13.0*cm, 6.5*cm])
         footer_table.setStyle(TableStyle([
-            ('GRID', (0,0), (-1,-1), 1, colors.black),
-            ('VALIGN', (0,0), (-1,-1), 'TOP'),
-            ('ALIGN', (1,0), (1,0), 'CENTER'),
+            ('BOX', (0,0), (-1,-1), 1, colors.black),
+            ('LINEBEFORE', (1,0), (1,-1), 1, colors.black),
+            ('SPAN', (0,0), (0,1)),
+            ('VALIGN', (0,0), (0,1), 'TOP'),
+            ('VALIGN', (1,0), (1,0), 'TOP'),
+            ('VALIGN', (1,1), (1,1), 'BOTTOM'),
+            ('ALIGN', (1,0), (1,1), 'CENTER'),
+            ('TOPPADDING', (1,0), (1,0), 6),
+            ('BOTTOMPADDING', (1,1), (1,1), 6),
         ]))
         elements.append(footer_table)
         

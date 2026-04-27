@@ -57,28 +57,60 @@ class OfficeMaster(QWidget):
         # Row 3: Email & Invoice Formatting
         row3_layout = QHBoxLayout()
         self.email_input = self.create_input_group(row3_layout, "Email Address", "Email for reports/backups", is_row=True)
-        self.invoice_format_input = self.create_input_group(row3_layout, "Invoice Number Format", "e.g. A4CA/{FY}/{MM}/{SEQ}", is_row=True)
+        
+        # Custom layout for Invoice Format to include preview right underneath
+        format_group = QVBoxLayout()
+        format_lbl = QLabel("Invoice Number Format")
+        format_lbl.setStyleSheet("font-weight: bold; color: #34495e; font-size: 12px;")
+        
+        self.invoice_format_input = QLineEdit()
+        self.invoice_format_input.setPlaceholderText("e.g. A4CA/{FY}/{MM}/{SEQ}")
+        self.invoice_format_input.setMinimumHeight(35)
+        self.invoice_format_input.setMaximumHeight(35)
         self.invoice_format_input.setText("A4CA/{FY}/{MM}/{SEQ}")
+        self.invoice_format_input.setStyleSheet("""
+            QLineEdit {
+                border: 1px solid #dcdde1;
+                border-radius: 5px;
+                padding: 0 10px;
+                background-color: #fcfcfc;
+            }
+            QLineEdit:focus { border: 1px solid #3498DB; background-color: #fff; }
+        """)
+        self.invoice_format_input.setToolTip("Variables: {FY}=Year, {MM}=Month, {SEQ}=Serial\nExample: A4CA/{FY}/{MM}/{SEQ}")
+        
+        self.preview_label = QLabel("Preview: A4CA/2526/04/001")
+        self.preview_label.setStyleSheet("color: #27ae60; font-size: 11px; font-weight: bold;")
+        
+        hint_label = QLabel("Use {FY}, {MM}, {SEQ}")
+        hint_label.setStyleSheet("color: #7f8c8d; font-size: 10px;")
+        
+        preview_layout = QHBoxLayout()
+        preview_layout.addWidget(self.preview_label)
+        preview_layout.addStretch()
+        preview_layout.addWidget(hint_label)
+        
+        examples_text = (
+            "Examples:<br>"
+            "• A4CA/{FY}/{MM}/{SEQ} ➔ A4CA/2526/04/001<br>"
+            "• DEL/{FY}/{MM}{SEQ} ➔ DEL/2526/04001<br>"
+            "• MUMBAI-{SEQ} ➔ MUMBAI-001"
+        )
+        examples_label = QLabel(examples_text)
+        examples_label.setStyleSheet("color: #95a5a6; font-size: 10px; margin-top: 2px;")
+        
+        format_group.addWidget(format_lbl)
+        format_group.addWidget(self.invoice_format_input)
+        format_group.addLayout(preview_layout)
+        format_group.addWidget(examples_label)
+        
+        format_container = QWidget()
+        format_container.setLayout(format_group)
+        row3_layout.addWidget(format_container)
+        
         self.initial_serial_input = self.create_input_group(row3_layout, "Initial Serial Number", "Start from (e.g. 0)", is_row=True)
         self.initial_serial_input.setText("0")
         card_layout.addLayout(row3_layout)
-        
-        # Helper text for formats
-        help_text = (
-            "<b>Format Variables:</b> {FY} = Fin. Year (2526), {MM} = Month (04), {SEQ} = Serial (001)<br>"
-            "<b>Examples:</b><br>"
-            "• Type <b>A4CA/{FY}/{MM}/{SEQ}</b> to get <i>A4CA/2526/04/001</i><br>"
-            "• Type <b>DEL/{FY}/{MM}{SEQ}</b> to get <i>DEL/2526/04001</i><br>"
-            "• Type <b>MUMBAI-{SEQ}</b> to get <i>MUMBAI-001</i>"
-        )
-        help_label = QLabel(help_text)
-        help_label.setStyleSheet("color: #7f8c8d; font-size: 11px;")
-        card_layout.addWidget(help_label)
-        
-        # Real-time preview label
-        self.preview_label = QLabel("Preview: A4CA/2526/04/001")
-        self.preview_label.setStyleSheet("color: #27ae60; font-size: 13px; font-weight: bold; margin-bottom: 5px;")
-        card_layout.addWidget(self.preview_label)
         
         # Connect signals for live preview
         self.invoice_format_input.textChanged.connect(self.update_preview)

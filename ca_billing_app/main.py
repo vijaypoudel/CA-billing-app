@@ -32,6 +32,21 @@ def main():
     font = QFont("Segoe UI" if os.name == "nt" else "Arial", 10)
     app.setFont(font)
     
+    # --- License Check ---
+    import license_manager
+    is_licensed, expiry, msg = license_manager.check_license()
+    
+    if not is_licensed:
+        from ui.license_ui import LicenseDialog
+        dialog = LicenseDialog(message=msg)
+        result = dialog.exec()
+        if not dialog.activated:
+            logging.info("License not activated. Exiting.")
+            sys.exit(0)
+    else:
+        logging.info(f"License OK: {msg}")
+    # --- End License Check ---
+    
     try:
         from ui.main_window import MainWindow
         window = MainWindow()
