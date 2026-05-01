@@ -2,7 +2,7 @@ import os
 import re
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Frame, PageTemplate
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Frame, PageTemplate, Image
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
@@ -61,8 +61,17 @@ class InvoicePDFGenerator:
         # Build single table to ensure perfectly aligned heights and borders
         address_text = office.get('address', '').strip()
         clean_address = re.sub(r'(?i)^address\s*:\s*', '', address_text)
-        row0 = [Paragraph(office['firm_name'].upper(), style_l_bold_firm), '', "Invoice No.", "Invoice Date"]
-        row1 = [Paragraph("<b>Address:</b>", style_l_bold), Paragraph(clean_address, style_s), inv['invoice_number'], inv['invoice_date']]
+        due_date = inv.get('due_date', '')
+        # Format due date if exists
+        if due_date:
+            try:
+                d_obj = datetime.datetime.strptime(due_date, '%Y-%m-%d').date()
+                due_date = d_obj.strftime("%d-%b-%Y")
+            except:
+                pass
+        
+        row0 = [Paragraph(office['firm_name'].upper(), style_l_bold_firm), '', "Invoice No. & Date", "Due Date"]
+        row1 = [Paragraph("<b>Address:</b>", style_l_bold), Paragraph(clean_address, style_s), Paragraph(f"<b>{inv['invoice_number']}</b><br/>{inv['invoice_date']}", style_s), Paragraph(f"<b>{due_date}</b>", style_s)]
         row2 = [Paragraph("<b>PAN</b>", style_l_bold), Paragraph(office['pan'], style_s), '', '']
         row3 = [Paragraph("<b>GSTIN:</b>", style_l_bold), Paragraph(office['gstin'], style_s), '', '']
         row4 = [Paragraph("<b>E-mail:</b>", style_l_bold), Paragraph(office.get('email', ''), style_s), '', '']
@@ -128,11 +137,16 @@ class InvoicePDFGenerator:
         # Extract POS from client address if possible, else placeholder
         pos = inv.get('place_of_supply', '') # Placeholder based on image, normally derived from Client State
         
+        # Handle Unregistered/International Clients
+        display_gstin = client['gstin']
+        if display_gstin.startswith('URP-'):
+            display_gstin = "Unregistered / International"
+            
         bill_data = [
             [Paragraph("<b>Bill To:</b>", style_n)],
             [Paragraph(client['client_name'].upper(), style_n)],
             [Paragraph(client['address'] or "", style_n)],
-            [Paragraph(f"<b>GSTIN: {client['gstin']}</b>", style_n)],
+            [Paragraph(f"<b>GSTIN: {display_gstin}</b>", style_n)],
             [Paragraph(f"<b>POS:</b> &nbsp;&nbsp;&nbsp;{pos}", style_n)]
         ]
         
@@ -157,7 +171,11 @@ class InvoicePDFGenerator:
         
         # To do merged cells in ReportLab, we define row 0 and row 1
         
-        h1 = ['S. No.', 'Description of Services', 'HSN', 'Taxable Value', 'CGST', '', 'SGST', '', 'IGST', '']
+        currency = inv.get('currency', 'INR')
+        curr_map = {'USD': '($)', 'EUR': '(€)', 'GBP': '(£)', 'INR': '(₹)'}
+        sym = curr_map.get(currency, '')
+        
+        h1 = ['S. No.', 'Description of Services', 'HSN', f'Taxable Value {sym}'.strip(), 'CGST', '', 'SGST', '', 'IGST', '']
         h2 = ['', '', '', '', 'Rate', 'Amount', 'Rate', 'Amount', 'Rate', 'Amount']
         
         # Prepare Rows
@@ -261,8 +279,8 @@ class InvoicePDFGenerator:
         elements.append(Spacer(1, 0)) # No space, attach to table
         
         tot_data = [
-            [Paragraph("<i>Total Invoice Value (In figures)</i>", style_s), f"{grand_total_rounded}"],
-            [Paragraph("<i>Total Invoice Value (In words)</i>", style_s), Paragraph(num_to_words(grand_total_rounded), ParagraphStyle('CenterBold', parent=style_s, alignment=1, fontName='Helvetica-Bold'))]
+            [Paragraph("<i>Total Invoice Value (In figures)</i>", style_s), f"{sym.strip('()')} {grand_total_rounded:,.2f}"],
+            [Paragraph("<i>Total Invoice Value (In words)</i>", style_s), Paragraph(num_to_words(grand_total_rounded, currency=currency), ParagraphStyle('CenterBold', parent=style_s, alignment=1, fontName='Helvetica-Bold'))]
         ]
         # Align this table with main divisions: Col 0+1+2+3 = 1.0 + 7.0 + 1.5 + 3.5 = 13.0cm
         tot_table = Table(tot_data, colWidths=[13.0*cm, 6.5*cm])
@@ -303,7 +321,16 @@ class InvoicePDFGenerator:
         # Signature
         style_c_small = ParagraphStyle('CenterSmall', parent=style_s, alignment=1) # 1=TA_CENTER
         firm_name_p = Paragraph(f"<b>{office['firm_name']}</b>", style_c_small)
-        sig_p = Paragraph("<br/>"*4 + "Valid Signature<br/>(Authorised Signatory)", style_c_small)
+        
+        # Check if signature image exists
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        sig_image_path = os.path.join(base_dir, 'assets', 'signature.png')
+        
+        if os.path.exists(sig_image_path):
+            sig_img = Image(sig_image_path, width=4*cm, height=1.5*cm)
+            sig_p = [Spacer(1, 0.2*cm), sig_img, Paragraph("Valid Signature<br/>(Authorised Signatory)", style_c_small)]
+        else:
+            sig_p = Paragraph("<br/>"*4 + "Valid Signature<br/>(Authorised Signatory)", style_c_small)
         
         footer_data = [
             [Paragraph(bank_details, style_s), firm_name_p],

@@ -88,6 +88,8 @@ def create_schema(connection):
         allotted_city TEXT,
 
         place_of_supply TEXT,
+        currency TEXT DEFAULT 'INR',
+        due_date DATE,
         
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         

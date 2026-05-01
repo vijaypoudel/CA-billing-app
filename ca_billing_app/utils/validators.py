@@ -6,4 +6,6 @@ def validate_gstin(gstin):
     if not gstin:
         return False
     gstin = gstin.strip().upper()
+    if gstin.startswith('URP-'):
+        return True
     return bool(re.match(GST_REGEX, gstin))

@@ -98,7 +98,7 @@ class InvoiceList(QWidget):
             # Join with invoice_items to get descriptions for search
             # We group cat description to avoid duplicate rows
             query = """
-                SELECT i.id, i.invoice_number, i.invoice_date, c.client_name, i.grand_total, i.status,
+                SELECT i.id, i.invoice_number, i.invoice_date, c.client_name, i.grand_total, i.status, i.currency,
                        GROUP_CONCAT(it.description, ', ') as descriptions
                 FROM invoices i
                 JOIN clients c ON i.client_gstin = c.gstin
@@ -133,7 +133,13 @@ class InvoiceList(QWidget):
             self.table.setItem(i, 1, QTableWidgetItem(row['invoice_number']))
             self.table.setItem(i, 2, QTableWidgetItem(str(row['invoice_date'])))
             self.table.setItem(i, 3, QTableWidgetItem(row['client_name']))
-            self.table.setItem(i, 4, QTableWidgetItem(f"{row['grand_total']:.2f}"))
+            
+            # Format currency
+            curr = row.get('currency', 'INR')
+            curr_map = {'USD': '$', 'EUR': '€', 'GBP': '£', 'INR': '₹'}
+            sym = curr_map.get(curr, '')
+            self.table.setItem(i, 4, QTableWidgetItem(f"{sym} {row['grand_total']:.2f}"))
+            
             # Status with color coding
             status_item = QTableWidgetItem(row['status'])
             status_item.setTextAlignment(Qt.AlignCenter)

@@ -63,6 +63,19 @@ class DatabaseManager:
             conn.execute("ALTER TABLE offices ADD COLUMN initial_serial INTEGER DEFAULT 0")
             conn.commit()
             print("Migration applied: offices.initial_serial column added.")
+            
+        cursor = conn.execute("PRAGMA table_info(invoices)")
+        inv_col_names = [row[1] for row in cursor.fetchall()]
+        
+        if 'currency' not in inv_col_names:
+            conn.execute("ALTER TABLE invoices ADD COLUMN currency TEXT DEFAULT 'INR'")
+            conn.commit()
+            print("Migration applied: invoices.currency column added.")
+            
+        if 'due_date' not in inv_col_names:
+            conn.execute("ALTER TABLE invoices ADD COLUMN due_date DATE")
+            conn.commit()
+            print("Migration applied: invoices.due_date column added.")
 
     def get_connection(self):
         """Returns a new connection object."""

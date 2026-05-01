@@ -36,7 +36,7 @@ class ClientMaster(QWidget):
         # Row 1: Name, GST, Phone
         row1_layout = QHBoxLayout()
         self.name_input = self.create_input_group(row1_layout, "Client Name", "Legal/Trade Name", is_row=True)
-        self.gstin_input = self.create_input_group(row1_layout, "GSTIN", "15-digit GSTIN", is_row=True)
+        self.gstin_input = self.create_input_group(row1_layout, "GSTIN", "Optional for Intl", is_row=True)
         self.phone_input = self.create_input_group(row1_layout, "Phone", "10-digit Number", is_row=True)
         card_layout.addLayout(row1_layout)
 
@@ -158,9 +158,18 @@ class ClientMaster(QWidget):
         email = self.email_input.text().strip()
         phone = self.phone_input.text().strip()
         
-        if not gstin or not name:
-            QMessageBox.warning(self, "Error", "GSTIN and Name are required.")
+        if not name:
+            QMessageBox.warning(self, "Error", "Client Name is required.")
             return
+            
+        # Handle empty GSTIN (Unregistered/International)
+        if not gstin:
+            import time
+            if self.current_gstin and self.current_gstin.startswith('URP-'):
+                gstin = self.current_gstin
+            else:
+                gstin = f"URP-{int(time.time())}"
+                
         if not validate_gstin(gstin):
              QMessageBox.warning(self, "Error", "Invalid GSTIN.")
              return

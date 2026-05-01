@@ -41,7 +41,7 @@ class ReportingService:
         query = """
             SELECT 
                 i.id, i.invoice_number, i.invoice_date, c.client_name, i.grand_total, i.status, 
-                i.allotted_bank, i.allotted_branch, i.client_gstin,
+                i.allotted_bank, i.allotted_branch, i.client_gstin, i.currency,
                 (SELECT SUM(p.amount_received) FROM payments p WHERE p.invoice_id = i.id) as total_received
             FROM invoices i
             JOIN clients c ON i.client_gstin = c.gstin

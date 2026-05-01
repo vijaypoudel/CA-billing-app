@@ -140,6 +140,40 @@ class OfficeMaster(QWidget):
         card_layout.addWidget(decl_lbl)
         card_layout.addWidget(self.declaration_input)
         
+        # Row 5: Signature Upload
+        sig_layout = QHBoxLayout()
+        sig_lbl = QLabel("Digital Signature:")
+        sig_lbl.setStyleSheet("font-weight: bold; color: #34495e; font-size: 12px;")
+        
+        self.upload_sig_btn = QPushButton("Upload Signature Image")
+        self.upload_sig_btn.setFixedHeight(30)
+        self.upload_sig_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #9b59b6; 
+                color: white; 
+                padding: 0 15px; 
+                border-radius: 4px;
+                font-size: 12px;
+            }
+            QPushButton:hover { background-color: #8e44ad; }
+        """)
+        self.upload_sig_btn.clicked.connect(self.upload_signature)
+        
+        self.sig_status_lbl = QLabel("")
+        self.sig_status_lbl.setStyleSheet("color: #27AE60; font-style: italic; font-size: 11px;")
+        
+        # Check if signature already exists
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if os.path.exists(os.path.join(base_dir, 'assets', 'signature.png')):
+            self.sig_status_lbl.setText("Signature Uploaded ✓")
+            
+        sig_layout.addWidget(sig_lbl)
+        sig_layout.addWidget(self.upload_sig_btn)
+        sig_layout.addWidget(self.sig_status_lbl)
+        sig_layout.addStretch()
+        
+        card_layout.addLayout(sig_layout)
+        
         # Buttons
         btn_layout = QHBoxLayout()
         self.save_btn = QPushButton("Save Business Profile")
@@ -491,6 +525,24 @@ class OfficeMaster(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Error", str(e))
 
+    def upload_signature(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Select Signature Image", "", "Images (*.png *.jpg *.jpeg)"
+        )
+        if file_path:
+            try:
+                base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                assets_dir = os.path.join(base_dir, 'assets')
+                if not os.path.exists(assets_dir):
+                    os.makedirs(assets_dir)
+                    
+                target_path = os.path.join(assets_dir, 'signature.png')
+                shutil.copy2(file_path, target_path)
+                self.sig_status_lbl.setText("Signature Uploaded ✓")
+                QMessageBox.information(self, "Success", "Digital signature uploaded successfully!")
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to upload signature: {str(e)}")
+                
     def load_data(self):
         while self.card_layout.count() > 1:
             item = self.card_layout.takeAt(0)

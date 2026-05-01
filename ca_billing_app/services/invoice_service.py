@@ -80,7 +80,7 @@ class InvoiceService:
         finally:
             conn.close()
 
-    def create_invoice(self, client_gstin, office_id, invoice_date, items, tax_type, allotted_details=None, manual_invoice_number=None):
+    def create_invoice(self, client_gstin, office_id, invoice_date, items, tax_type, allotted_details=None, manual_invoice_number=None, currency="INR", due_date=None):
         """
         allotted_details: dict with keys 'bank', 'branch', 'city'
         """
@@ -137,13 +137,13 @@ class InvoiceService:
                     invoice_number, invoice_date, financial_year, month_str, serial_number,
                     client_gstin, office_id, tax_type, 
                     taxable_value, cgst_amount, sgst_amount, igst_amount, grand_total, status,
-                    allotted_bank, allotted_branch, allotted_city, place_of_supply
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Generated', ?, ?, ?, ?)
+                    allotted_bank, allotted_branch, allotted_city, place_of_supply, currency, due_date
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Generated', ?, ?, ?, ?, ?, ?)
             """, (
                 invoice_number, invoice_date, fy, month_str, serial_number,
                 client_gstin, office_id, tax_type,
                 taxable_value, cgst_total, sgst_total, igst_total, grand_total,
-                bank, branch, city, pos
+                bank, branch, city, pos, currency, due_date
             ))
             
             invoice_id = cursor.lastrowid
