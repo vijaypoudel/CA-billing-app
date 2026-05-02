@@ -182,3 +182,23 @@ class InvoiceService:
             }
         finally:
             conn.close()
+
+    def delete_invoice(self, invoice_id):
+        """Permanently delete an invoice and its associated items/payments."""
+        conn = self.db.get_connection()
+        try:
+            conn.execute("BEGIN TRANSACTION")
+            # 1. Delete Payments
+            conn.execute("DELETE FROM payments WHERE invoice_id = ?", (invoice_id,))
+            # 2. Delete Items
+            conn.execute("DELETE FROM invoice_items WHERE invoice_id = ?", (invoice_id,))
+            # 3. Delete Invoice
+            conn.execute("DELETE FROM invoices WHERE id = ?", (invoice_id,))
+            conn.commit()
+            return True
+        except Exception as e:
+            conn.rollback()
+            logging.error(f"Error deleting invoice {invoice_id}: {e}")
+            raise e
+        finally:
+            conn.close()

@@ -128,25 +128,10 @@ class InvoiceForm(QWidget):
         self.tax_combo = QComboBox()
         self.tax_combo.addItems(["IGST", "CGST_SGST", "NONE"])
         self.tax_combo.setStyleSheet("font-weight: normal; padding: 5px;")
-        # Currency Type
-        self.currency_combo = QComboBox()
-        self.currency_combo.addItems(["INR", "USD", "EUR", "GBP"])
-        self.currency_combo.setStyleSheet("font-weight: normal; padding: 5px;")
-        self.currency_combo.setMinimumWidth(150)
-        self.currency_combo.setMaximumWidth(250)
-        
-        # Due Date
-        self.due_date_edit = QDateEdit()
-        self.due_date_edit.setCalendarPopup(True)
-        self.due_date_edit.setDate(datetime.date.today() + datetime.timedelta(days=15))
-        self.due_date_edit.setStyleSheet("font-weight: normal; padding: 5px;")
-        
         inv_form.addRow("Client (GSTIN):", self.client_combo)
         inv_form.addRow("Invoice Date:", self.date_edit)
-        inv_form.addRow("Due Date:", self.due_date_edit)
         inv_form.addRow("Place of Supply:", self.pos_combo)
         inv_form.addRow("Tax Type:", self.tax_combo)
-        inv_form.addRow("Currency:", self.currency_combo)
         
         top_hbox.addWidget(business_group, 4)
         top_hbox.addWidget(invoice_details_group, 6)
@@ -559,9 +544,8 @@ class InvoiceForm(QWidget):
         client_gstin = self.client_combo.currentData()
         office_id = self.office_combo.currentData()
         date_str = self.date_edit.date().toString("yyyy-MM-dd")
-        due_date_str = self.due_date_edit.date().toString("yyyy-MM-dd")
         tax_type = self.tax_combo.currentText()
-        currency = self.currency_combo.currentText()
+        currency = "INR"
         
         # Get selected bank details (Use currentText/Data from combo boxes)
         bank = self.bank_combo.currentText()
@@ -643,11 +627,11 @@ class InvoiceForm(QWidget):
                         UPDATE invoices SET 
                             client_gstin=?, office_id=?, invoice_date=?, tax_type=?,
                             taxable_value=?, cgst_amount=?, sgst_amount=?, igst_amount=?, grand_total=?,
-                            allotted_bank=?, allotted_branch=?, allotted_city=?, place_of_supply=?, currency=?, due_date=?,
+                            allotted_bank=?, allotted_branch=?, allotted_city=?, place_of_supply=?, currency=?,
                             status = CASE WHEN status = 'Cancelled' THEN 'Generated' ELSE status END
                         WHERE id=?
                     """, (client_gstin, office_id, date_str, tax_type, taxable_total, cgst_total, 
-                          sgst_total, igst_total, grand_total, bank, branch, city, allotted['pos'], currency, due_date_str, inv_id))
+                          sgst_total, igst_total, grand_total, bank, branch, city, allotted['pos'], currency, inv_id))
                     
                     # 4. Update items
                     conn.execute("DELETE FROM invoice_items WHERE invoice_id=?", (inv_id,))
@@ -680,7 +664,7 @@ class InvoiceForm(QWidget):
                 # --- CREATE MODE ---
                 # Create DB Entry
                 inv_id, invoice_number = self.invoice_service.create_invoice(
-                    client_gstin, office_id, date_str, items, tax_type, allotted_details=allotted, currency=currency, due_date=due_date_str
+                    client_gstin, office_id, date_str, items, tax_type, allotted_details=allotted, currency=currency
                 )
                 
                 # Generate PDF
@@ -843,7 +827,6 @@ class InvoiceForm(QWidget):
             self.office_combo.blockSignals(True)
             self.client_combo.blockSignals(True)
             self.date_edit.blockSignals(True)
-            self.due_date_edit.blockSignals(True)
             self.pos_combo.blockSignals(True)
             self.bank_combo.blockSignals(True)
             self.city_combo.blockSignals(True)
@@ -869,14 +852,6 @@ class InvoiceForm(QWidget):
                 except Exception as e:
                     print(f"Date parse error: {e}")
                 
-                # Due Date
-                if invoice['due_date']:
-                    try:
-                        d_obj = datetime.datetime.strptime(invoice['due_date'], '%Y-%m-%d').date()
-                        self.due_date_edit.setDate(QDate(d_obj.year, d_obj.month, d_obj.day))
-                    except:
-                        pass
-                        
                 # POS
                 if invoice['place_of_supply']:
                     for i in range(self.pos_combo.count()):
@@ -921,7 +896,6 @@ class InvoiceForm(QWidget):
                 self.client_combo.blockSignals(False)
                 self.date_edit.blockSignals(False)
                 self.pos_combo.blockSignals(False)
-                self.due_date_edit.blockSignals(False)
                 self.bank_combo.blockSignals(False)
                 self.city_combo.blockSignals(False)
                 self.branch_combo.blockSignals(False)

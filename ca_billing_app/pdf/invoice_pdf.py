@@ -61,17 +61,8 @@ class InvoicePDFGenerator:
         # Build single table to ensure perfectly aligned heights and borders
         address_text = office.get('address', '').strip()
         clean_address = re.sub(r'(?i)^address\s*:\s*', '', address_text)
-        due_date = inv.get('due_date', '')
-        # Format due date if exists
-        if due_date:
-            try:
-                d_obj = datetime.datetime.strptime(due_date, '%Y-%m-%d').date()
-                due_date = d_obj.strftime("%d-%b-%Y")
-            except:
-                pass
-        
-        row0 = [Paragraph(office['firm_name'].upper(), style_l_bold_firm), '', "Invoice No. & Date", "Due Date"]
-        row1 = [Paragraph("<b>Address:</b>", style_l_bold), Paragraph(clean_address, style_s), Paragraph(f"<b>{inv['invoice_number']}</b><br/>{inv['invoice_date']}", style_s), Paragraph(f"<b>{due_date}</b>", style_s)]
+        row0 = [Paragraph(office['firm_name'].upper(), style_l_bold_firm), '', "Invoice No.", "Invoice Date"]
+        row1 = [Paragraph("<b>Address:</b>", style_l_bold), Paragraph(clean_address, style_s), inv['invoice_number'], inv['invoice_date']]
         row2 = [Paragraph("<b>PAN</b>", style_l_bold), Paragraph(office['pan'], style_s), '', '']
         row3 = [Paragraph("<b>GSTIN:</b>", style_l_bold), Paragraph(office['gstin'], style_s), '', '']
         row4 = [Paragraph("<b>E-mail:</b>", style_l_bold), Paragraph(office.get('email', ''), style_s), '', '']
@@ -144,10 +135,10 @@ class InvoicePDFGenerator:
             
         bill_data = [
             [Paragraph("<b>Bill To:</b>", style_n)],
-            [Paragraph(client['client_name'].upper(), style_n)],
-            [Paragraph(client['address'] or "", style_n)],
-            [Paragraph(f"<b>GSTIN: {display_gstin}</b>", style_n)],
-            [Paragraph(f"<b>POS:</b> &nbsp;&nbsp;&nbsp;{pos}", style_n)]
+            [Paragraph(client['client_name'].upper(), style_b)],
+            [Paragraph(client['address'] or "", style_s)],
+            [Paragraph(f"<b>GSTIN: {display_gstin}</b>", style_b)],
+            [Paragraph(f"<b>POS:</b> &nbsp;&nbsp;&nbsp;{pos}", style_s)]
         ]
         
         bill_table = Table(bill_data, colWidths=[19.5*cm])
@@ -171,9 +162,9 @@ class InvoicePDFGenerator:
         
         # To do merged cells in ReportLab, we define row 0 and row 1
         
-        currency = inv.get('currency', 'INR')
-        curr_map = {'USD': '($)', 'EUR': '(€)', 'GBP': '(£)', 'INR': '(₹)'}
-        sym = curr_map.get(currency, '')
+        currency = "INR" # India-specific branch: Always INR
+        curr_map = {'USD': '($)', 'EUR': '(€)', 'GBP': '(£)', 'INR': '(INR)'}
+        sym = '(INR)'
         
         h1 = ['S. No.', 'Description of Services', 'HSN', f'Taxable Value {sym}'.strip(), 'CGST', '', 'SGST', '', 'IGST', '']
         h2 = ['', '', '', '', 'Rate', 'Amount', 'Rate', 'Amount', 'Rate', 'Amount']
@@ -234,8 +225,11 @@ class InvoicePDFGenerator:
         rows.append(total_row)
         
         # Column Widths (Sum to exactly 19.5cm for A4 max space)
-        # S.No(1.0), Desc(8.0), HSN(1.5), Taxable Value(2.5) => Total 13.0cm Split
-        cw = [1.0*cm, 8.0*cm, 1.5*cm, 2.5*cm,  1.0*cm, 1.25*cm,  1.0*cm, 1.25*cm,  1.0*cm, 1.0*cm]
+        # S.No(1.0), Desc(8.5), HSN(1.0), Taxable Value(2.5) => Total 13.0cm
+        # GST Section: 0.8 (Rate) + 1.4 (Amt) x 3 = 6.6cm
+        # 13.0 + 6.6 = 19.6? Wait. 
+        # 1.0 + 8.2 + 1.0 + 2.5 + 0.8 + 1.4 + 0.8 + 1.4 + 0.8 + 1.6 = 19.5
+        cw = [1.0*cm, 8.2*cm, 1.0*cm, 2.5*cm,  0.8*cm, 1.4*cm,  0.8*cm, 1.4*cm,  0.8*cm, 1.6*cm]
         
         t = Table(rows, colWidths=cw)
         t.setStyle(TableStyle([

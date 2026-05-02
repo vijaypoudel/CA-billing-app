@@ -5,6 +5,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction, QColor, QBrush
 from db.database import db_manager
 from services.payment_service import PaymentService
+from services.invoice_service import InvoiceService
 import datetime
 
 class PaymentDialog(QDialog):
@@ -67,6 +68,7 @@ class InvoiceList(QWidget):
         super().__init__()
         self.db = db_manager
         self.payment_service = PaymentService()
+        self.invoice_service = InvoiceService()
         self.layout = QVBoxLayout(self)
         
         # Search Bar
@@ -135,10 +137,7 @@ class InvoiceList(QWidget):
             self.table.setItem(i, 3, QTableWidgetItem(row['client_name']))
             
             # Format currency
-            curr = row.get('currency', 'INR')
-            curr_map = {'USD': '$', 'EUR': '€', 'GBP': '£', 'INR': '₹'}
-            sym = curr_map.get(curr, '')
-            self.table.setItem(i, 4, QTableWidgetItem(f"{sym} {row['grand_total']:.2f}"))
+            self.table.setItem(i, 4, QTableWidgetItem(f"INR {row['grand_total']:.2f}"))
             
             # Status with color coding
             status_item = QTableWidgetItem(row['status'])
@@ -186,6 +185,10 @@ class InvoiceList(QWidget):
             
             hist_act = menu.addAction("View History")
             hist_act.triggered.connect(lambda _, rid=inv_id: self.view_history(rid))
+            
+            menu.addSeparator()
+            delete_act = menu.addAction("Delete Invoice")
+            delete_act.triggered.connect(lambda _, rid=inv_id: self.delete_invoice_action(rid))
             
             actions_btn.setMenu(menu)
             self.table.setCellWidget(i, 7, actions_btn)
@@ -268,4 +271,19 @@ class InvoiceList(QWidget):
         if dialog.exec() == QDialog.Accepted:
             # Refresh list if changes were saved
             self.load_invoices()
+
+    def delete_invoice_action(self, invoice_id):
+        reply = QMessageBox.question(
+            self, "Confirm Delete", 
+            "Are you sure you want to PERMANENTLY delete this invoice? This cannot be undone.",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        )
+        
+        if reply == QMessageBox.Yes:
+            try:
+                self.invoice_service.delete_invoice(invoice_id)
+                QMessageBox.information(self, "Deleted", "Invoice deleted from database.")
+                self.load_invoices()
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to delete invoice: {e}")
 

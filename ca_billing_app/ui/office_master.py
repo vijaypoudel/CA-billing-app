@@ -5,7 +5,7 @@ import platform
 import shutil
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, 
                                QLineEdit, QPushButton, QMessageBox, QLabel, 
-                               QGroupBox, QScrollArea, QFrame, QFileDialog, QTextEdit)
+                               QGroupBox, QScrollArea, QFrame, QFileDialog, QTextEdit, QGridLayout, QBoxLayout)
 from PySide6.QtCore import Qt, Slot
 from db.database import db_manager
 from config_manager import config_manager
@@ -44,19 +44,23 @@ class OfficeMaster(QWidget):
         card_layout.setContentsMargins(15, 15, 15, 15)
         card_layout.setSpacing(10)
         
-        # Row 1: Name, GST, PAN
-        row1_layout = QHBoxLayout()
-        self.firm_name_input = self.create_input_group(row1_layout, "Firm Name", "e.g. ANKITA AGARWAL & ASSOCIATES", is_row=True)
-        self.gstin_input = self.create_input_group(row1_layout, "GSTIN", "15-digit GSTIN", is_row=True)
-        self.pan_input = self.create_input_group(row1_layout, "PAN", "10-digit PAN", is_row=True)
-        card_layout.addLayout(row1_layout)
+        # Grid Layout for main fields to prevent overlapping
+        grid_layout = QGridLayout()
+        grid_layout.setSpacing(20)
+        
+        self.firm_name_input = self.create_input_group_v2(grid_layout, "Firm Name", "e.g. ANKITA AGARWAL & ASSOCIATES", 0, 0)
+        self.gstin_input = self.create_input_group_v2(grid_layout, "GSTIN", "15-digit GSTIN", 0, 1)
+        self.pan_input = self.create_input_group_v2(grid_layout, "PAN", "10-digit PAN", 0, 2)
+        
+        card_layout.addLayout(grid_layout)
         
         # Row 2: Address
-        self.address_input = self.create_input_group(card_layout, "Full Address", "Complete address for billing")
+        self.address_input = self.create_input_group_v2(card_layout, "Full Address", "Complete address for billing")
         
         # Row 3: Email & Invoice Formatting
-        row3_layout = QHBoxLayout()
-        self.email_input = self.create_input_group(row3_layout, "Email Address", "Email for reports/backups", is_row=True)
+        row3_grid = QGridLayout()
+        row3_grid.setSpacing(20)
+        self.email_input = self.create_input_group_v2(row3_grid, "Email Address", "Email for reports/backups", 0, 0)
         
         # Custom layout for Invoice Format to include preview right underneath
         format_group = QVBoxLayout()
@@ -106,11 +110,11 @@ class OfficeMaster(QWidget):
         
         format_container = QWidget()
         format_container.setLayout(format_group)
-        row3_layout.addWidget(format_container)
+        row3_grid.addWidget(format_container, 0, 1)
         
-        self.initial_serial_input = self.create_input_group(row3_layout, "Initial Serial Number", "Start from (e.g. 0)", is_row=True)
+        self.initial_serial_input = self.create_input_group_v2(row3_grid, "Initial Serial Number", "Start from (e.g. 0)", 0, 2)
         self.initial_serial_input.setText("0")
-        card_layout.addLayout(row3_layout)
+        card_layout.addLayout(row3_grid)
         
         # Connect signals for live preview
         self.invoice_format_input.textChanged.connect(self.update_preview)
@@ -176,50 +180,57 @@ class OfficeMaster(QWidget):
         
         # Buttons
         btn_layout = QHBoxLayout()
+        btn_layout.setSpacing(15)
         self.save_btn = QPushButton("Save Business Profile")
-        self.save_btn.setFixedHeight(35)
+        self.save_btn.setFixedHeight(40)
         self.save_btn.clicked.connect(self.save_office)
         self.save_btn.setStyleSheet("""
             QPushButton {
                 background-color: #3498DB; 
                 color: white; 
                 font-weight: bold; 
-                padding: 0 20px; 
-                border-radius: 4px;
+                padding: 0 25px; 
+                border-radius: 6px;
+                font-size: 13px;
             }
             QPushButton:hover { background-color: #2980B9; }
         """)
         
         self.clear_btn = QPushButton("Clear")
-        self.clear_btn.setFixedHeight(35)
+        self.clear_btn.setFixedHeight(40)
         self.clear_btn.clicked.connect(self.clear_form)
         self.clear_btn.setStyleSheet("""
             QPushButton {
-                background-color: #ecf0f1; 
+                background-color: #f8f9fa; 
                 color: #2c3e50; 
-                padding: 0 20px; 
-                border-radius: 4px;
-                border: 1px solid #bdc3c7;
+                padding: 0 25px; 
+                border-radius: 6px;
+                border: 1px solid #dcdde1;
+                font-size: 13px;
             }
-            QPushButton:hover { background-color: #dfe6e9; }
+            QPushButton:hover { background-color: #e9ecef; }
         """)
         
-        # Compact Backup Scheduler in same row as buttons to save space
-        btn_layout.addWidget(self.save_btn)
-        btn_layout.addWidget(self.clear_btn)
-        btn_layout.addSpacing(20)
+        # Compact Backup Scheduler
+        sched_container = QFrame()
+        sched_container.setStyleSheet("background-color: #f1f8f5; border: 1px solid #d4efdf; border-radius: 6px; padding: 2px 10px;")
+        sched_hbox = QHBoxLayout(sched_container)
+        sched_hbox.setContentsMargins(5, 5, 5, 5)
         
-        # Inline Scheduler
         sched_lbl = QLabel("🛡️ Daily Tasks:")
-        sched_lbl.setStyleSheet("color: #27AE60; font-weight: bold; font-size: 11px;")
+        sched_lbl.setStyleSheet("color: #27AE60; font-weight: bold; font-size: 12px; border: none;")
         self.sched_btn = QPushButton("Enable Scheduler")
         self.sched_btn.clicked.connect(self.enable_scheduler)
         self.sched_btn.setFixedHeight(30)
-        self.sched_btn.setStyleSheet("background-color: #27AE60; color: white; font-size: 11px; padding: 0 10px; border-radius: 4px;")
+        self.sched_btn.setStyleSheet("background-color: #27AE60; color: white; font-size: 11px; padding: 0 12px; border-radius: 4px; border: none;")
         
-        btn_layout.addWidget(sched_lbl)
-        btn_layout.addWidget(self.sched_btn)
+        sched_hbox.addWidget(sched_lbl)
+        sched_hbox.addWidget(self.sched_btn)
+        
+        btn_layout.addWidget(self.save_btn)
+        btn_layout.addWidget(self.clear_btn)
         btn_layout.addStretch()
+        btn_layout.addWidget(sched_container)
         card_layout.addLayout(btn_layout)
         
         self.main_layout.addWidget(form_card)
@@ -428,32 +439,35 @@ class OfficeMaster(QWidget):
                 QMessageBox.critical(self, "Error", f"Failed to relocate database: {e}")
 
 
-    def create_input_group(self, parent_layout, label_text, placeholder, is_row=False):
-        group = QVBoxLayout() if not is_row else QVBoxLayout()
+    def create_input_group_v2(self, parent_layout, label_text, placeholder, row=None, col=None):
+        group = QVBoxLayout()
         lbl = QLabel(label_text)
         lbl.setStyleSheet("font-weight: bold; color: #34495e; font-size: 12px;")
         
         line_edit = QLineEdit()
         line_edit.setPlaceholderText(placeholder)
-        line_edit.setMinimumHeight(35)
-        line_edit.setMaximumHeight(35)
+        line_edit.setMinimumHeight(40)
+        line_edit.setMaximumHeight(40)
         line_edit.setStyleSheet("""
             QLineEdit {
                 border: 1px solid #dcdde1;
-                border-radius: 5px;
-                padding: 0 10px;
+                border-radius: 6px;
+                padding: 0 12px;
                 background-color: #fcfcfc;
+                font-size: 13px;
             }
-            QLineEdit:focus { border: 1px solid #3498DB; background-color: #fff; }
+            QLineEdit:focus { border: 1.5px solid #3498DB; background-color: #fff; }
         """)
         
         group.addWidget(lbl)
         group.addWidget(line_edit)
         
-        if is_row:
+        if isinstance(parent_layout, QGridLayout):
             container = QWidget()
             container.setLayout(group)
-            parent_layout.addWidget(container)
+            parent_layout.addWidget(container, row, col)
+        elif isinstance(parent_layout, QBoxLayout):
+            parent_layout.addLayout(group)
         else:
             parent_layout.addLayout(group)
             

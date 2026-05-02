@@ -295,7 +295,7 @@ class HelpUI(QWidget):
         self.add_faq("Can I add my logo?", "Currently, the invoices use a professional text-based header based on your Firm Name.")
         self.add_faq("How to handle discount?", "You can enter a negative amount in a line item or adjust the rate accordingly.")
         self.add_faq("What is 'Financial Year (FY)'?", "It's the 12-month period from April to March used for tax in India.")
-        self.add_faq("Can I change the currency?", "The app is pre-configured for Indian Rupees (₹) and Indian numbering system (Lakhs/Crores).")
+        self.add_faq("Can I change the currency?", "The app is pre-configured for Indian Rupees (INR) and Indian numbering system (Lakhs/Crores).")
         self.add_faq("My client has no GSTIN?", "You can leave it blank; the app will mark it as an 'Unregistered' client.")
         self.add_faq("Can I filter reports by city?", "Yes, Pending Payment reports can be filtered by the Bank's branch city.")
         self.add_faq("How to clean up old data?", "We recommend archiving the folder and starting a new database if the file becomes very large.")

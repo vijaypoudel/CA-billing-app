@@ -19,7 +19,7 @@ class PaymentService:
             
             # Validate: payment should not exceed remaining balance
             if amount > remaining + 0.01:  # Small tolerance for floating point
-                raise ValueError(f"Payment amount (₹{amount:.2f}) exceeds remaining balance (₹{remaining:.2f})")
+                raise ValueError(f"Payment amount (INR {amount:.2f}) exceeds remaining balance (INR {remaining:.2f})")
             
             conn.execute("BEGIN")
             
