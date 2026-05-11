@@ -43,38 +43,36 @@ class InvoiceService:
                     invoice_format = r.get('invoice_format') or invoice_format
                     initial_serial = r.get('initial_serial') or initial_serial
 
-            # Get ALL invoice numbers for this FY and month
+            # 1. Determine the prefix of the current office's format to find matching sequences
+            # Everything before {SEQ} is treated as the unique prefix for this sequence
+            format_prefix = invoice_format.split('{SEQ}')[0]
+            replaced_prefix = format_prefix.replace('{FY}', fy).replace('{MM}', month_str)
+
+            # 2. Get the max serial number among ALL invoices that share this prefix
+            # This ensures sequential numbering across multiple offices if they use the same format
             query = """
-                SELECT invoice_number 
+                SELECT MAX(serial_number) as max_s
                 FROM invoices 
-                WHERE financial_year = ? AND month_str = ? AND office_id = ?
+                WHERE invoice_number LIKE ? AND financial_year = ? AND month_str = ?
             """
-            cursor = conn.execute(query, (fy, month_str, office_id)) if office_id else conn.execute("SELECT invoice_number FROM invoices WHERE financial_year = ? AND month_str = ?", (fy, month_str))
-            rows = cursor.fetchall()
+            row = conn.execute(query, (replaced_prefix + '%', fy, month_str)).fetchone()
             
-            max_serial = initial_serial - 1 if initial_serial > 0 else 0
+            db_max = row['max_s'] if row and row['max_s'] is not None else 0
             
-            # Identify max serial from DB
-            for row in rows:
-                inv_num = row['invoice_number']
-                # Best effort to extract serial number from the end of the string
-                try:
-                    # Look for {SEQ} location in format, but string formats vary. 
-                    # Easiest heuristic: extract numbers from the end
-                    import re
-                    match = re.search(r'(\d+)$', inv_num)
-                    if match:
-                        serial = int(match.group(1))
-                        if serial > max_serial:
-                            max_serial = serial
-                except Exception:
-                    continue
+            # Start from the higher of: (last used in DB) or (initial_serial - 1)
+            max_serial = max(db_max, initial_serial - 1)
             
+            # 3. Generate and verify uniqueness globally
             next_serial = max_serial + 1
-            serial_str = f"{next_serial:03d}"
-            
-            # Apply format replacement
-            formatted_num = invoice_format.replace('{FY}', fy).replace('{MM}', month_str).replace('{SEQ}', serial_str)
+            while True:
+                serial_str = f"{next_serial:03d}"
+                formatted_num = invoice_format.replace('{FY}', fy).replace('{MM}', month_str).replace('{SEQ}', serial_str)
+                
+                # Double check global uniqueness to avoid UNIQUE constraint error
+                exists = conn.execute("SELECT 1 FROM invoices WHERE invoice_number = ?", (formatted_num,)).fetchone()
+                if not exists:
+                    break
+                next_serial += 1
             
             return formatted_num, next_serial
         finally:

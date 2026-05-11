@@ -859,12 +859,12 @@ class InvoiceForm(QWidget):
                             self.pos_combo.setCurrentIndex(i)
                             break
                             
-                # Currency
-                if 'currency' in invoice.keys() and invoice['currency']:
-                    for i in range(self.currency_combo.count()):
-                        if self.currency_combo.itemText(i) == invoice['currency']:
-                            self.currency_combo.setCurrentIndex(i)
-                            break
+                # Currency (Not used in India branch UI)
+                # if 'currency' in invoice.keys() and invoice['currency']:
+                #     for i in range(self.currency_combo.count()):
+                #         if self.currency_combo.itemText(i) == invoice['currency']:
+                #             self.currency_combo.setCurrentIndex(i)
+                #             break
                 
                 # Bank details (Cascading)
                 if invoice['allotted_bank']:
