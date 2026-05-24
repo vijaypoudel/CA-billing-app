@@ -61,21 +61,35 @@ class DatabaseManager:
             
         if 'initial_serial' not in col_names:
             conn.execute("ALTER TABLE offices ADD COLUMN initial_serial INTEGER DEFAULT 0")
+            conn.execute("ALTER TABLE offices ADD COLUMN lut_arn TEXT")
+            conn.execute("ALTER TABLE offices ADD COLUMN lut_expiry TEXT")
+            conn.execute("ALTER TABLE offices ADD COLUMN is_active INTEGER DEFAULT 1")
             conn.commit()
-            print("Migration applied: offices.initial_serial column added.")
+            print("Migration applied: offices.initial_serial, lut_arn, lut_expiry, is_active columns added.")
             
         cursor = conn.execute("PRAGMA table_info(invoices)")
         inv_col_names = [row[1] for row in cursor.fetchall()]
         
         if 'currency' not in inv_col_names:
+            conn.execute("ALTER TABLE invoices ADD COLUMN place_of_supply TEXT")
             conn.execute("ALTER TABLE invoices ADD COLUMN currency TEXT DEFAULT 'INR'")
-            conn.commit()
-            print("Migration applied: invoices.currency column added.")
-            
-        if 'due_date' not in inv_col_names:
             conn.execute("ALTER TABLE invoices ADD COLUMN due_date DATE")
+
+        if 'is_export' not in inv_col_names:
+            conn.execute("ALTER TABLE invoices ADD COLUMN is_export INTEGER DEFAULT 0")
+            conn.execute("ALTER TABLE invoices ADD COLUMN conversion_rate REAL")
+            conn.execute("ALTER TABLE invoices ADD COLUMN conversion_date TEXT")
             conn.commit()
-            print("Migration applied: invoices.due_date column added.")
+            print("Migration applied: invoices export columns added.")
+
+        # Check offices columns
+        off_cols = conn.execute("PRAGMA table_info(offices)").fetchall()
+        off_col_names = [c[1] for c in off_cols]
+        if 'lut_arn' not in off_col_names:
+            conn.execute("ALTER TABLE offices ADD COLUMN lut_arn TEXT")
+            conn.execute("ALTER TABLE offices ADD COLUMN lut_expiry TEXT")
+            conn.commit()
+            print("Migration applied: offices LUT columns added.")
 
     def get_connection(self):
         """Returns a new connection object."""

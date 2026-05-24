@@ -90,6 +90,9 @@ def create_schema(connection):
         place_of_supply TEXT,
         currency TEXT DEFAULT 'INR',
         due_date DATE,
+        is_export INTEGER DEFAULT 0,
+        conversion_rate REAL,
+        conversion_date TEXT,
         
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         

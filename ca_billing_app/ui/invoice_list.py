@@ -282,8 +282,15 @@ class InvoiceList(QWidget):
         if reply == QMessageBox.Yes:
             try:
                 self.invoice_service.delete_invoice(invoice_id)
+<<<<<<< Updated upstream
                 QMessageBox.information(self, "Deleted", "Invoice deleted from database.")
                 self.load_invoices()
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Failed to delete invoice: {e}")
+=======
+                QMessageBox.information(self, "Deleted", "Invoice deleted successfully.")
+                self.load_invoices()
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to delete: {e}")
+>>>>>>> Stashed changes
 

@@ -118,7 +118,32 @@ class InvoicePDFGenerator:
         ]))
         
         elements.append(Paragraph("Tax Invoice", style_h))
-        elements.append(Spacer(1, 0.2*cm))
+        elements.append(Spacer(1, 0.4*cm))
+        
+        # --- EXPORT DECLARATIONS ---
+        if inv.get('is_export'):
+            export_style = ParagraphStyle('ExportDecl', parent=style_s, alignment=1, fontName='Helvetica-Bold', fontSize=10, leading=12)
+            elements.append(Paragraph("SUPPLY MEANT FOR EXPORT UNDER LUT WITHOUT PAYMENT OF IGST", export_style))
+            
+            lut_arn = office.get('lut_arn', '')
+            lut_expiry = office.get('lut_expiry', '')
+            if lut_arn:
+                lut_text = f"LUT ARN: {lut_arn}"
+                if lut_expiry:
+                    lut_text += f" ({lut_expiry})"
+                elements.append(Paragraph(lut_text, export_style))
+            
+            # Conversion Rate if present
+            conv_rate = inv.get('conversion_rate')
+            conv_date = inv.get('conversion_date')
+            if conv_rate:
+                note = f"Conversion Rate: {conv_rate}"
+                if conv_date:
+                    note += f" (as on {conv_date})"
+                elements.append(Paragraph(f"<i>Note: {note}</i>", ParagraphStyle('Note', parent=style_s, alignment=1, fontSize=9)))
+            
+            elements.append(Spacer(1, 0.4*cm))
+
         elements.append(header_table)
         
         # Box around top section - removed space to attach to Bill To
@@ -128,27 +153,38 @@ class InvoicePDFGenerator:
         # Extract POS from client address if possible, else placeholder
         pos = inv.get('place_of_supply', '') # Placeholder based on image, normally derived from Client State
         
-        # Handle Unregistered/International Clients
+        # Handle Unregistered/International Clients - Hide GSTIN line if unregistered
         display_gstin = client['gstin']
-        if display_gstin.startswith('URP-'):
-            display_gstin = "Unregistered / International"
-            
         bill_data = [
             [Paragraph("<b>Bill To:</b>", style_n)],
+<<<<<<< Updated upstream
             [Paragraph(client['client_name'].upper(), style_b)],
             [Paragraph(client['address'] or "", style_s)],
             [Paragraph(f"<b>GSTIN: {display_gstin}</b>", style_b)],
             [Paragraph(f"<b>POS:</b> &nbsp;&nbsp;&nbsp;{pos}", style_s)]
+=======
+            [Paragraph(client['client_name'].upper(), style_n)],
+            [Paragraph(client['address'] or "", style_n)]
+>>>>>>> Stashed changes
         ]
+        
+        if display_gstin and not display_gstin.startswith('URP-'):
+            bill_data.append([Paragraph(f"<b>GSTIN: {display_gstin}</b>", style_n)])
+        else:
+            # If international/unregistered, maybe just show "International / Unregistered" if user wants, 
+            # but user said "remove gstin", so we skip the label entirely.
+            pass
+            
+        bill_data.append([Paragraph(f"<b>POS:</b> &nbsp;&nbsp;&nbsp;{pos}", style_n)])
         
         bill_table = Table(bill_data, colWidths=[19.5*cm])
         bill_table.setStyle(TableStyle([
             ('BOX', (0,0), (-1,-1), 1, colors.black),
-            ('LINEABOVE', (0,4), (0,4), 1, colors.black), # Line above POS
+            ('LINEABOVE', (0,-1), (0,-1), 1, colors.black), # Line above POS (last row)
             ('TOPPADDING', (0,0), (-1,-1), 2),
             ('BOTTOMPADDING', (0,0), (-1,-1), 2),
-            ('TOPPADDING', (0,4), (0,4), 4), # Extra padding for POS
-            ('BOTTOMPADDING', (0,4), (0,4), 4),
+            ('TOPPADDING', (0,-1), (0,-1), 4), # Extra padding for POS
+            ('BOTTOMPADDING', (0,-1), (0,-1), 4),
         ]))
         elements.append(bill_table)
         elements.append(Spacer(1, 0))
@@ -272,10 +308,38 @@ class InvoicePDFGenerator:
         # Total Box
         elements.append(Spacer(1, 0)) # No space, attach to table
         
+        is_export_conv = inv.get('is_export') and inv.get('conversion_rate')
+        
         tot_data = [
-            [Paragraph("<i>Total Invoice Value (In figures)</i>", style_s), f"{sym.strip('()')} {grand_total_rounded:,.2f}"],
-            [Paragraph("<i>Total Invoice Value (In words)</i>", style_s), Paragraph(num_to_words(grand_total_rounded, currency=currency), ParagraphStyle('CenterBold', parent=style_s, alignment=1, fontName='Helvetica-Bold'))]
+            [Paragraph("<i>Total Invoice Value (In figures)</i>", style_s), f"{sym.strip('()')} {grand_total_rounded:,.2f}"]
         ]
+        
+        # Add original currency words ONLY if not doing an export conversion
+        if not is_export_conv:
+            tot_data.append([
+                Paragraph("<i>Total Invoice Value (In words)</i>", style_s), 
+                Paragraph(num_to_words(grand_total_rounded, currency=currency), ParagraphStyle('CenterBold', parent=style_s, alignment=1, fontName='Helvetica-Bold'))
+            ])
+        
+        # Add INR conversion row if applicable
+        if is_export_conv:
+            try:
+                rate = float(inv['conversion_rate'])
+                inr_total = grand_total * rate
+                inr_total_rounded = round(inr_total)
+                
+                tot_data.append([
+                    Paragraph("<b>Final Total in INR (Converted)</b>", style_s), 
+                    f"INR {inr_total_rounded:,.2f}"
+                ])
+                # Add Words for INR as the FINAL word line
+                tot_data.append([
+                    Paragraph("<i>Total INR Value (In words)</i>", style_s),
+                    Paragraph(num_to_words(inr_total_rounded, currency='INR'), ParagraphStyle('CenterBold', parent=style_s, alignment=1, fontName='Helvetica-Bold'))
+                ])
+            except Exception as e:
+                print(f"Conversion error in PDF: {e}")
+                
         # Align this table with main divisions: Col 0+1+2+3 = 1.0 + 7.0 + 1.5 + 3.5 = 13.0cm
         tot_table = Table(tot_data, colWidths=[13.0*cm, 6.5*cm])
         tot_table.setStyle(TableStyle([

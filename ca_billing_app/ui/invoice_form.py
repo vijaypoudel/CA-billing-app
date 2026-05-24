@@ -133,6 +133,22 @@ class InvoiceForm(QWidget):
         inv_form.addRow("Place of Supply:", self.pos_combo)
         inv_form.addRow("Tax Type:", self.tax_combo)
         
+        # Export Options
+        self.is_export_cb = QCheckBox("Export under LUT?")
+        self.is_export_cb.setStyleSheet("font-weight: normal;")
+        self.is_export_cb.toggled.connect(self.toggle_export_fields)
+        inv_form.addRow("Export:", self.is_export_cb)
+        
+        self.conversion_rate_input = QLineEdit()
+        self.conversion_rate_input.setPlaceholderText("e.g. 1 USD = 83.5 INR")
+        self.conversion_rate_input.setVisible(False)
+        inv_form.addRow("Conv. Rate:", self.conversion_rate_input)
+        
+        self.conversion_date_input = QLineEdit()
+        self.conversion_date_input.setPlaceholderText("e.g. 30th April")
+        self.conversion_date_input.setVisible(False)
+        inv_form.addRow("Conv. Date:", self.conversion_date_input)
+        
         top_hbox.addWidget(business_group, 4)
         top_hbox.addWidget(invoice_details_group, 6)
         self.layout.addLayout(top_hbox)
@@ -281,7 +297,29 @@ class InvoiceForm(QWidget):
         self.gen_btn.clicked.connect(self.generate_invoice)
         bottom_hbox.addWidget(self.gen_btn, 3)
         
+        if is_update_mode:
+            self.delete_btn = QPushButton("DELETE INVOICE")
+            self.delete_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #E74C3C; 
+                    color: white; 
+                    padding: 15px 20px; 
+                    font-weight: bold; 
+                    font-size: 14px; 
+                    border-radius: 8px;
+                }
+                QPushButton:hover { background-color: #C0392B; }
+            """)
+            self.delete_btn.clicked.connect(self.delete_current_invoice)
+            bottom_hbox.insertWidget(2, self.delete_btn)
+        
         self.layout.addLayout(bottom_hbox)
+        
+    def toggle_export_fields(self, checked):
+        self.conversion_rate_input.setVisible(checked)
+        self.conversion_date_input.setVisible(checked)
+        if checked:
+            self.tax_combo.setCurrentText("NONE") # LUT exports usually have no IGST paid
         
         # Initial loads
         # (load_offices ensures self.office_display is set)
@@ -289,6 +327,24 @@ class InvoiceForm(QWidget):
         self.load_offices()
         self.load_clients()
         self.load_declaration_default()
+
+    def delete_current_invoice(self):
+        if not self.current_invoice_id:
+            return
+            
+        reply = QMessageBox.question(
+            self, "Confirm Delete", 
+            "Are you sure you want to PERMANENTLY delete this invoice? This cannot be undone.",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        )
+        
+        if reply == QMessageBox.Yes:
+            try:
+                self.invoice_service.delete_invoice(self.current_invoice_id)
+                QMessageBox.information(self, "Deleted", "Invoice deleted successfully.")
+                self.invoice_processed.emit() # This will signal the dialog to close
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to delete: {e}")
 
     def check_db_schema(self):
         conn = self.db.get_connection()
@@ -545,7 +601,14 @@ class InvoiceForm(QWidget):
         office_id = self.office_combo.currentData()
         date_str = self.date_edit.date().toString("yyyy-MM-dd")
         tax_type = self.tax_combo.currentText()
+<<<<<<< Updated upstream
         currency = "INR"
+=======
+        currency = self.currency_combo.currentText()
+        is_export = 1 if self.is_export_cb.isChecked() else 0
+        conv_rate = self.conversion_rate_input.text()
+        conv_date = self.conversion_date_input.text()
+>>>>>>> Stashed changes
         
         # Get selected bank details (Use currentText/Data from combo boxes)
         bank = self.bank_combo.currentText()
@@ -627,11 +690,21 @@ class InvoiceForm(QWidget):
                         UPDATE invoices SET 
                             client_gstin=?, office_id=?, invoice_date=?, tax_type=?,
                             taxable_value=?, cgst_amount=?, sgst_amount=?, igst_amount=?, grand_total=?,
+<<<<<<< Updated upstream
                             allotted_bank=?, allotted_branch=?, allotted_city=?, place_of_supply=?, currency=?,
                             status = CASE WHEN status = 'Cancelled' THEN 'Generated' ELSE status END
                         WHERE id=?
                     """, (client_gstin, office_id, date_str, tax_type, taxable_total, cgst_total, 
                           sgst_total, igst_total, grand_total, bank, branch, city, allotted['pos'], currency, inv_id))
+=======
+                            allotted_bank=?, allotted_branch=?, allotted_city=?, place_of_supply=?, currency=?, due_date=?,
+                            is_export=?, conversion_rate=?, conversion_date=?,
+                            status = CASE WHEN status = 'Cancelled' THEN 'Generated' ELSE status END
+                        WHERE id=?
+                    """, (client_gstin, office_id, date_str, tax_type, taxable_total, cgst_total, 
+                          sgst_total, igst_total, grand_total, bank, branch, city, allotted['pos'], currency, due_date_str,
+                          is_export, conv_rate, conv_date, inv_id))
+>>>>>>> Stashed changes
                     
                     # 4. Update items
                     conn.execute("DELETE FROM invoice_items WHERE invoice_id=?", (inv_id,))
@@ -664,7 +737,13 @@ class InvoiceForm(QWidget):
                 # --- CREATE MODE ---
                 # Create DB Entry
                 inv_id, invoice_number = self.invoice_service.create_invoice(
+<<<<<<< Updated upstream
                     client_gstin, office_id, date_str, items, tax_type, allotted_details=allotted, currency=currency
+=======
+                    client_gstin, office_id, date_str, items, tax_type, 
+                    allotted_details=allotted, currency=currency, due_date=due_date_str,
+                    is_export=is_export, conversion_rate=conv_rate, conversion_date=conv_date
+>>>>>>> Stashed changes
                 )
                 
                 # Generate PDF
@@ -852,6 +931,22 @@ class InvoiceForm(QWidget):
                 except Exception as e:
                     print(f"Date parse error: {e}")
                 
+<<<<<<< Updated upstream
+=======
+                # Due Date
+                if invoice['due_date']:
+                    try:
+                        d_obj = datetime.datetime.strptime(invoice['due_date'], '%Y-%m-%d').date()
+                        self.due_date_edit.setDate(QDate(d_obj.year, d_obj.month, d_obj.day))
+                    except:
+                        pass
+                        
+                # Export
+                self.is_export_cb.setChecked(invoice['is_export'] == 1)
+                self.conversion_rate_input.setText(str(invoice['conversion_rate'] or ''))
+                self.conversion_date_input.setText(invoice['conversion_date'] or '')
+                
+>>>>>>> Stashed changes
                 # POS
                 if invoice['place_of_supply']:
                     for i in range(self.pos_combo.count()):

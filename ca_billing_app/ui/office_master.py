@@ -54,6 +54,12 @@ class OfficeMaster(QWidget):
         
         card_layout.addLayout(grid_layout)
         
+        # Row 1.5: LUT Details (For Exports)
+        lut_row = QHBoxLayout()
+        self.lut_arn_input = self.create_input_group(lut_row, "LUT ARN (Exports)", "e.g. AD2904...", is_row=True)
+        self.lut_expiry_input = self.create_input_group(lut_row, "LUT Validity Period", "e.g. Valid for FY 2026-27", is_row=True)
+        card_layout.addLayout(lut_row)
+        
         # Row 2: Address
         self.address_input = self.create_input_group_v2(card_layout, "Full Address", "Complete address for billing")
         
@@ -481,6 +487,8 @@ class OfficeMaster(QWidget):
         email = self.email_input.text().strip()
         decl = self.declaration_input.toPlainText().strip()
         invoice_format = self.invoice_format_input.text().strip() or "A4CA/{FY}/{MM}/{SEQ}"
+        lut_arn = self.lut_arn_input.text().strip()
+        lut_expiry = self.lut_expiry_input.text().strip()
         
         initial_serial = 0
         if self.initial_serial_input.text().strip().isdigit():
@@ -495,15 +503,15 @@ class OfficeMaster(QWidget):
             if self.current_id:
                 conn.execute("""
                     UPDATE offices 
-                    SET firm_name=?, address=?, gstin=?, pan=?, email=?, declaration=?, invoice_format=?, initial_serial=?
+                    SET firm_name=?, address=?, gstin=?, pan=?, email=?, declaration=?, invoice_format=?, initial_serial=?, lut_arn=?, lut_expiry=?
                     WHERE id=?
-                """, (firm_name, address, gstin, pan, email, decl, invoice_format, initial_serial, self.current_id))
+                """, (firm_name, address, gstin, pan, email, decl, invoice_format, initial_serial, lut_arn, lut_expiry, self.current_id))
                 QMessageBox.information(self, "Success", "Business profile updated.")
             else:
                 conn.execute("""
-                    INSERT INTO offices (firm_name, address, gstin, pan, email, declaration, invoice_format, initial_serial, is_active)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
-                """, (firm_name, address, gstin, pan, email, decl, invoice_format, initial_serial))
+                    INSERT INTO offices (firm_name, address, gstin, pan, email, declaration, invoice_format, initial_serial, lut_arn, lut_expiry, is_active)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+                """, (firm_name, address, gstin, pan, email, decl, invoice_format, initial_serial, lut_arn, lut_expiry))
                 QMessageBox.information(self, "Success", "Business profile saved.")
                 
             conn.commit()
@@ -639,6 +647,8 @@ class OfficeMaster(QWidget):
         self.email_input.setText(r['email'] or '')
         self.invoice_format_input.setText(r.get('invoice_format') or "A4CA/{FY}/{MM}/{SEQ}")
         self.initial_serial_input.setText(str(r.get('initial_serial', 0)))
+        self.lut_arn_input.setText(r.get('lut_arn') or '')
+        self.lut_expiry_input.setText(r.get('lut_expiry') or '')
         self.update_preview()
         self.declaration_input.setPlainText(r['declaration'] or DEFAULT_DECLARATION)
         self.save_btn.setText("Update Business Profile")
@@ -663,6 +673,8 @@ class OfficeMaster(QWidget):
         self.email_input.clear()
         self.invoice_format_input.setText("A4CA/{FY}/{MM}/{SEQ}")
         self.initial_serial_input.setText("0")
+        self.lut_arn_input.clear()
+        self.lut_expiry_input.clear()
         self.update_preview()
         self.declaration_input.setPlainText(DEFAULT_DECLARATION)
         self.save_btn.setText("Save Business Profile")
